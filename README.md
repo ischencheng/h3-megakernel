@@ -3,11 +3,11 @@ University of Pennsylvania, CIS 5650: GPU Programming and Architecture, Final Pr
 * Chen Cheng, Ryan Morris, Neel Shejwalkar
 * Tested on: NVIDIA RTX PRO 6000 Blackwell Server Edition, 96 GB
 
-### Screenshots
+### Demo
 
-![fasth3_v2_1344x768](images/fasth3_v2_1344x768.png)
+https://github.com/user-attachments/assets/5839d2a3-41d2-468b-96dc-6bdff2e7ea01
 
-These are four frames of a 5 s clip with audio, generated on one RTX PRO 6000.
+This is a 5 s clip at 1344x768 with audio, generated on one RTX PRO 6000.
 
 ### H3 Megakernel
 
