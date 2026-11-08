@@ -1,0 +1,5 @@
+data/
+__pycache__/
+*.pyc
+*.ncu-rep
+*.nsys-rep
