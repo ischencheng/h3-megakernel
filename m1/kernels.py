@@ -1,12 +1,3 @@
-"""Build our CUDA extension and list the variants run.py compares.
-
-Each variant is fn(x, w1, w2) -> y with
-  x  [M, HIDDEN]  BF16, contiguous
-  w1 [2*FFN, HIDDEN] BF16, gate rows first (see weights.py)
-  w2 [HIDDEN, FFN] BF16
-  y  [M, HIDDEN]  BF16
-"""
-
 import functools
 
 import torch
@@ -44,14 +35,18 @@ def _ours(name, *args):
         raise
 
 
+def _split(x, w):
+    return _ours("mlp_split", x, *w.fc1, *w.fc2)
+
+
+# name -> (fn(x, w), capture_as_graph)
 def variants(groups=config.GROUP_TOKENS):
-    """name -> (fn(x, w1, w2), capture_as_graph)."""
     table = {
-        "cublas": (reference.mlp_cublas, False),
-        "cublas_graph": (reference.mlp_cublas, True),
-        "split": (lambda x, w1, w2: _ours("mlp_split", x, w1, w2), False),
-        "split_graph": (lambda x, w1, w2: _ours("mlp_split", x, w1, w2), True),
+        "flashinfer": (reference.mlp_flashinfer, False),
+        "flashinfer_graph": (reference.mlp_flashinfer, True),
+        "split": (_split, False),
+        "split_graph": (_split, True),
     }
     for g in groups:
-        table[f"fused_g{g}"] = (lambda x, w1, w2, g=g: _ours("mlp_fused", x, w1, w2, g), False)
+        table[f"fused_g{g}"] = (lambda x, w, g=g: _ours("mlp_fused", x, *w.fc1, *w.fc2, g), False)
     return table

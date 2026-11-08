@@ -1,5 +1,3 @@
-"""Timing: CUDA events around each call, L2 flushed before every timed run."""
-
 import statistics
 
 import torch
@@ -7,8 +5,8 @@ import torch
 from . import config
 
 
+# writing a buffer bigger than l2 leaves it cold
 class L2Flusher:
-    """Writes a buffer larger than L2 so the next run starts with a cold cache."""
 
     def __init__(self, nbytes=config.L2_FLUSH_BYTES, device="cuda"):
         self.buffer = torch.empty(nbytes, dtype=torch.uint8, device=device)
@@ -18,7 +16,6 @@ class L2Flusher:
 
 
 def capture_graph(fn):
-    """Capture fn() into a CUDA graph and return a callable that replays it."""
     stream = torch.cuda.Stream()
     stream.wait_stream(torch.cuda.current_stream())
     with torch.cuda.stream(stream):
@@ -32,7 +29,6 @@ def capture_graph(fn):
 
 
 def time_fn(fn, name, warmup=config.WARMUP, iters=config.ITERS, flush=True):
-    """Median and spread of fn() in milliseconds."""
     flusher = L2Flusher() if flush else None
     for _ in range(warmup):
         fn()

@@ -1,11 +1,3 @@
-"""Milestone 1 driver: check every variant against FP32, then time the ones that pass.
-
-  python -m m1.run                         # all token counts, all variants
-  python -m m1.run --tokens 256 4096 --variants cublas split fused_g2048
-  python -m m1.run --profile-once ...      # one call per variant inside an NVTX
-                                           # range "mlp", for ncu --nvtx-include "mlp/"
-"""
-
 import argparse
 import json
 import os
@@ -47,15 +39,15 @@ def _first_line(exc):
     return f"{type(exc).__name__}: {str(exc).strip().splitlines()[0] if str(exc).strip() else ''}"
 
 
-def run_checked(args, table, w1, w2):
+def run_checked(args, table, w):
     rows = []
     for tokens in args.tokens:
         x = reference.make_input(tokens)
-        ref = reference.mlp_fp32(x, w1, w2)
-        bar = check.error_stats(reference.mlp_cublas(x, w1, w2), ref)
+        ref = reference.mlp_fp32(x, w)
+        bar = check.error_stats(reference.mlp_flashinfer(x, w), ref)
         for name in args.variants:
             fn, as_graph = table[name]
-            call = lambda fn=fn: fn(x, w1, w2)
+            call = lambda fn=fn: fn(x, w)
             row = {"tokens": tokens, "variant": name, "bar": bar}
             try:
                 y = call()
@@ -63,7 +55,7 @@ def run_checked(args, table, w1, w2):
             except kernels.NotImplementedKernel:
                 rows.append({**row, "status": "not_implemented"})
                 continue
-            except Exception as exc:  # a build or launch failure should not stop the sweep
+            except Exception as exc:  # keep sweeping after a build failure
                 rows.append({**row, "status": "error", "error": _first_line(exc)})
                 continue
             stats = check.error_stats(y, ref)
@@ -81,19 +73,19 @@ def run_checked(args, table, w1, w2):
     return rows
 
 
-def run_profile_once(args, table, w1, w2):
+def run_profile_once(args, table, w):
     for tokens in args.tokens:
         x = reference.make_input(tokens)
         for name in args.variants:
             fn, _ = table[name]
             try:
-                fn(x, w1, w2)  # outside the range: builds, picks cuBLAS heuristics
+                fn(x, w)  # builds and compiles outside the range
                 torch.cuda.synchronize()
             except Exception as exc:
                 print(f"skip {name} M={tokens}: {_first_line(exc)}")
                 continue
             torch.cuda.nvtx.range_push("mlp")
-            fn(x, w1, w2)
+            fn(x, w)
             torch.cuda.nvtx.range_pop()
             torch.cuda.synchronize()
             print(f"profiled {name} M={tokens}")
@@ -101,23 +93,23 @@ def run_profile_once(args, table, w1, w2):
 
 def print_table(rows):
     ok = {(r["tokens"], r["variant"]): r for r in rows if r["status"] == "ok"}
-    print(f"{'tokens':>7} {'variant':<14} {'status':<16} {'rel_l2':>9} {'max/rms':>9} "
-          f"{'median ms':>10} {'spread':>7} {'TFLOP/s':>8} {'vs cublas_graph':>16}")
+    print(f"{'tokens':>7} {'variant':<17} {'status':<16} {'rel_l2':>9} {'max/rms':>9} "
+          f"{'median ms':>10} {'spread':>7} {'TFLOP/s':>8} {'vs flashinfer_graph':>20}")
     for r in rows:
-        base = ok.get((r["tokens"], "cublas_graph"))
-        line = f"{r['tokens']:>7} {r['variant']:<14} {r['status']:<16}"
+        base = ok.get((r["tokens"], "flashinfer_graph"))
+        line = f"{r['tokens']:>7} {r['variant']:<17} {r['status']:<16}"
         if "rel_l2" in r:
             line += f" {r['rel_l2']:>9.2e} {r['max_over_rms']:>9.2e}"
         if r["status"] == "ok":
             ratio = base["median_ms"] / r["median_ms"] if base else float("nan")
-            line += f" {r['median_ms']:>10.3f} {r['spread']:>7.1%} {r['tflops']:>8.1f} {ratio:>15.3f}x"
+            line += f" {r['median_ms']:>10.3f} {r['spread']:>7.1%} {r['tflops']:>8.1f} {ratio:>19.3f}x"
         elif r["status"] == "error":
             line += f"  {r['error']}"
         print(line)
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description="check every variant against fp32, then time the ones that pass")
     parser.add_argument("--tokens", type=int, nargs="+", default=list(config.TOKENS))
     parser.add_argument("--groups", type=int, nargs="+", default=list(config.GROUP_TOKENS))
     parser.add_argument("--variants", nargs="+", default=None, help="default: all")
@@ -136,13 +128,13 @@ def main():
 
     device = _device_info()
     print(json.dumps(device))
-    w1, w2 = weights.load("cuda")
+    w = weights.load("cuda")
 
     if args.profile_once:
-        run_profile_once(args, table, w1, w2)
+        run_profile_once(args, table, w)
         return
 
-    rows = run_checked(args, table, w1, w2)
+    rows = run_checked(args, table, w)
     print_table(rows)
     result = {
         "device": device,

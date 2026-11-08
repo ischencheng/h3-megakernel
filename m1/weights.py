@@ -1,33 +1,30 @@
-"""Fetch the block-0 MLP weights without downloading the whole checkpoint.
-
-The shard is about 5 GB, but we only need two tensors (about 0.46 GB), so we
-read the safetensors header and then only those byte ranges.
-
-Layout trap: this Diffusers export stores ff.net.0.proj value-first (up, then
-gate), while H3's native fc1 is gate-first. vLLM-Omni swaps the halves when it
-loads the checkpoint (see `swap_halves` in minimax_h3_transformer.py). We save
-the weights already in the native gate-first order, so every kernel and the
-reference see rows [0, FFN) as gate and rows [FFN, 2*FFN) as up.
-
-Run: python -m m1.weights
-"""
-
-import hashlib
 import json
 import struct
 import urllib.request
+from typing import NamedTuple
 
 import torch
 from safetensors.torch import load_file, save_file
 
 from . import config
 
-_URL = f"https://huggingface.co/{config.HF_REPO}/resolve/{config.HF_REVISION}/{config.HF_SHARD}"
+_URL = f"https://huggingface.co/{config.HF_REPO}/resolve/{config.HF_REVISION}/{config.HF_FILE}"
 _CHUNK = 64 << 20
 
 
+class Linear(NamedTuple):
+    w: torch.Tensor         # [out, in/2] packed fp4, low nibble first
+    s: torch.Tensor         # [out, in/16] fp8 scales, swizzled for 128x4
+    alpha: torch.Tensor     # weight scale
+    input_sf: torch.Tensor  # calibrated activation scale
+
+
+class Weights(NamedTuple):
+    fc1: Linear  # up rows first, then gate
+    fc2: Linear
+
+
 def _read_range(start, end):
-    """Bytes [start, end) of the shard, in chunks with a few retries."""
     out = bytearray()
     pos = start
     while pos < end:
@@ -48,53 +45,43 @@ def _read_range(start, end):
     return bytes(out)
 
 
-def _fetch_tensor(header, data_start, key):
-    info = header[key]
-    if info["dtype"] != "BF16":
-        raise RuntimeError(f"{key} is {info['dtype']}, expected BF16")
-    begin, end = info["data_offsets"]
-    raw = _read_range(data_start + begin, data_start + end)
-    tensor = torch.frombuffer(bytearray(raw), dtype=torch.bfloat16).reshape(info["shape"]).clone()
-    return tensor, hashlib.sha256(raw).hexdigest()
-
-
 def fetch():
     header_len = struct.unpack("<Q", _read_range(0, 8))[0]
     header = json.loads(_read_range(8, 8 + header_len))
     data_start = 8 + header_len
 
-    fc1, fc1_sha = _fetch_tensor(header, data_start, config.FC1_KEY)
-    fc2, fc2_sha = _fetch_tensor(header, data_start, config.FC2_KEY)
-    if tuple(fc1.shape) != (config.FC1_OUT, config.HIDDEN) or tuple(fc2.shape) != (config.HIDDEN, config.FFN):
-        raise RuntimeError(f"unexpected shapes: fc1 {tuple(fc1.shape)}, fc2 {tuple(fc2.shape)}")
+    def tensor(prefix, field, dtype):
+        info = header[f"{prefix}::{field}"]
+        begin, end = info["data_offsets"]
+        raw = _read_range(data_start + begin, data_start + end)
+        return torch.frombuffer(bytearray(raw), dtype=dtype).reshape(info["shape"]).clone()
 
-    up, gate = fc1.chunk(2, dim=0)
-    w1 = torch.cat((gate, up), dim=0).contiguous()
+    tensors = {}
+    for name, prefix, rows, columns in (("1", config.FC1_PREFIX, config.FC1_OUT, config.HIDDEN),
+                                        ("2", config.FC2_PREFIX, config.HIDDEN, config.FFN)):
+        tensors[f"w{name}"] = tensor(prefix, "_nvfp4_weight", torch.uint8)
+        tensors[f"s{name}"] = tensor(prefix, "_nvfp4_weight_scale", torch.uint8)
+        tensors[f"alpha{name}"] = tensor(prefix, "_nvfp4_alpha", torch.float32)
+        tensors[f"sf{name}"] = tensor(prefix, "_nvfp4_input_global_sf", torch.float32)
+        if tuple(tensors[f"w{name}"].shape) != (rows, columns // 2) or tuple(tensors[f"s{name}"].shape) != (rows, columns // 16):
+            raise RuntimeError(f"unexpected shapes for {prefix}")
 
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    meta = {
-        "repo": config.HF_REPO,
-        "revision": config.HF_REVISION,
-        "shard": config.HF_SHARD,
-        "fc1_key": config.FC1_KEY,
-        "fc2_key": config.FC2_KEY,
-        "fc1_sha256": fc1_sha,
-        "fc2_sha256": fc2_sha,
-        "w1_layout": "gate rows [0, FFN), up rows [FFN, 2*FFN)",
-    }
-    save_file({"w1": w1, "w2": fc2.contiguous()}, str(config.WEIGHTS_FILE), metadata=meta)
+    meta = {"repo": config.HF_REPO, "revision": config.HF_REVISION, "file": config.HF_FILE,
+            "w1_layout": "up rows [0, FFN), gate rows [FFN, 2*FFN)"}
+    save_file(tensors, str(config.WEIGHTS_FILE), metadata=meta)
     return config.WEIGHTS_FILE
 
 
 def load(device="cuda"):
-    """Return (w1, w2) on `device`: w1 [2*FFN, HIDDEN] gate-first, w2 [HIDDEN, FFN]."""
     if not config.WEIGHTS_FILE.exists():
         fetch()
-    tensors = load_file(str(config.WEIGHTS_FILE), device=str(device))
-    return tensors["w1"], tensors["w2"]
+    t = load_file(str(config.WEIGHTS_FILE), device=str(device))
+    return Weights(*(Linear(t[f"w{n}"], t[f"s{n}"], t[f"alpha{n}"], t[f"sf{n}"]) for n in "12"))
 
 
 if __name__ == "__main__":
     path = fetch()
-    w1, w2 = load("cpu")
-    print(f"saved {path}: w1 {tuple(w1.shape)}, w2 {tuple(w2.shape)}")
+    w = load("cpu")
+    print(f"saved {path}: fc1 {tuple(w.fc1.w.shape)} alpha {w.fc1.alpha.item()} input_sf {w.fc1.input_sf.item()}, "
+          f"fc2 {tuple(w.fc2.w.shape)} alpha {w.fc2.alpha.item()} input_sf {w.fc2.input_sf.item()}")
