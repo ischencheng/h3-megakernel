@@ -1,0 +1,119 @@
+{
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition, 97887 MiB, 610.57.04",
+ "model": "FastVideo/FastVideo-FastH3-8-Step-V2-NVFP4-Consumer",
+ "revision": "9d0d0d3ae69365aded83fab5562f00f9f06c12aa",
+ "env": {
+  "FASTVIDEO_H3_VSA_FP4": "1",
+  "FASTVIDEO_MINIMAX_H3_FUSIONS": "all",
+  "FASTVIDEO_NVFP4_MM_BACKEND": "cutlass",
+  "FASTVIDEO_H3_VAE_TILE_BATCH": "28",
+  "FASTVIDEO_STAGE_LOGGING": "1"
+ },
+ "runs": [
+  {
+   "shape": "1344x768",
+   "rep": 0,
+   "client_s": 253.18080735206604,
+   "peak_mib": 68385,
+   "generation_s": 252.72706492700001,
+   "reported_peak_mb": 56878.24072265625,
+   "video_path": "/cache/runs/fv-v2-res-1344x768-r1/1344x768-r0.mp4",
+   "stages": {
+    "input_preparation_stage": 5.256800000097428e-05,
+    "conditioning_stage": 126.64136744799998,
+    "latent_preparation_stage": 0.012892200999999659,
+    "denoising_stage": 28.614326310999985,
+    "video_decoding_stage": 97.26016513100001,
+    "audio_decoding_stage": 0.14509692199999336,
+    "PostDecodeFrameProcessStage": 0.02687107299999525,
+    "VideoSaveStage": 0.4220771470000386,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ]
+  },
+  {
+   "shape": "1344x768",
+   "rep": 1,
+   "client_s": 31.038690328598022,
+   "peak_mib": 67851,
+   "generation_s": 30.55030610199998,
+   "reported_peak_mb": 56877.7373046875,
+   "video_path": "/cache/runs/fv-v2-res-1344x768-r1/1344x768-r1.mp4",
+   "stages": {
+    "input_preparation_stage": 5.2207999999609456e-05,
+    "conditioning_stage": 0.08520011600000998,
+    "latent_preparation_stage": 0.01171047300005057,
+    "denoising_stage": 25.889258496000025,
+    "video_decoding_stage": 4.466118356999971,
+    "audio_decoding_stage": 0.048305399000014404,
+    "PostDecodeFrameProcessStage": 0.04733669399996643,
+    "VideoSaveStage": 0.42292049600001747,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ]
+  },
+  {
+   "shape": "1344x768",
+   "rep": 2,
+   "client_s": 31.032408952713013,
+   "peak_mib": 67851,
+   "generation_s": 30.56251228000002,
+   "reported_peak_mb": 56880.00927734375,
+   "video_path": "/cache/runs/fv-v2-res-1344x768-r1/1344x768-r2.mp4",
+   "stages": {
+    "input_preparation_stage": 4.65279999843915e-05,
+    "conditioning_stage": 0.07945330999996258,
+    "latent_preparation_stage": 0.010660538999957225,
+    "denoising_stage": 25.916389744000014,
+    "video_decoding_stage": 4.472639469000001,
+    "audio_decoding_stage": 0.04887882799999943,
+    "PostDecodeFrameProcessStage": 0.03651941399999714,
+    "VideoSaveStage": 0.4246454339999559,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ]
+  }
+ ],
+ "startup_s": 22.1161630153656,
+ "loaded_peak_mib": 57055,
+ "resident_mib": 58275
+}
