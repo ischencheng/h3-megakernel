@@ -18,8 +18,8 @@ The component is the MLP of one DiT block: `y = (silu(x W_gate^T) * (x W_up^T)) 
 
 We compare a split build (two kernels) and a fused build (one persistent
 kernel) that share the same GEMM tile, so any difference comes from fusion.
-The token counts run from 256 to 33,472; 14,314 and 33,472 are the DiT
-lengths of a 5 s video at 832x480 and 1344x768.
+The token counts run from 256 to 37,696; 14,830 and 37,696 are the DiT
+lengths of a 5 s video at 832x480 and 1344x768 (derivation in `m1/config.py`).
 
 What is in this repo:
 
@@ -92,19 +92,19 @@ Variants not written yet show `not_implemented`.
 
 ### First numbers: cuBLAS on one RTX PRO 6000 (2026-11-08)
 
-From `results/m1-RTX-PRO-6000-Blackwell-Server-Edition-20261108-060440.json`
+From `results/m1-RTX-PRO-6000-Blackwell-Server-Edition-20261108-060852.json`
 and one `--ncu` run. This is the bar our kernels are compared against.
 
 | Tokens | Median (ms) | TFLOP/s | FC1 DRAM read | FC2 DRAM read |
 |---:|---:|---:|---:|---:|
-| 256 | 0.473 | 250 | 0.31 GB | 0.16 GB |
-| 1,024 | 1.262 | 375 | | |
-| 4,096 | 4.911 | 386 | 0.39 GB | 0.36 GB |
-| 14,314 | 17.583 | 376 | | |
-| 33,472 | 41.022 | 377 | 5.35 GB | 4.41 GB |
+| 256 | 0.472 | 251 | 0.31 GB | 0.16 GB |
+| 1,024 | 1.329 | 356 | | |
+| 4,096 | 4.820 | 393 | 0.39 GB | 0.36 GB |
+| 14,830 | 18.418 | 372 | | |
+| 37,696 | 46.316 | 376 | 5.99 GB | 4.98 GB |
 
 Times are the CUDA-graph variant with L2 flushed. The cuBLAS kernels here are
 `cutlass_80_tensorop_bf16_s16816gemm` (`mma.sync` with 256x128 tiles), since
-sm_120 has no `wgmma` or `tcgen05`. At 33,472 tokens FC1 reads 5.35 GB from
+sm_120 has no `wgmma` or `tcgen05`. At 37,696 tokens FC1 reads 5.99 GB from
 DRAM although its weights are only 0.31 GB, so cuBLAS already re-reads the
 weights many times; the fused build's group size has to be judged against that.

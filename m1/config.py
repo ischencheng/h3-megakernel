@@ -12,10 +12,13 @@ HIDDEN = 5376
 FFN = 14336
 FC1_OUT = 2 * FFN  # fc1 holds gate and up stacked: rows [0, FFN) gate, [FFN, 2*FFN) up
 
-# Token counts to sweep. 14,314 and 33,472 are the DiT sequence lengths of a
-# 5 s T2VA request at 832x480 and 1344x768 (12,090 and 31,248 video tokens,
-# plus about 2,224 text and audio tokens).
-TOKENS = (256, 1024, 4096, 14314, 33472)
+# Token counts to sweep. 14,830 and 37,696 are the DiT sequence lengths of a
+# 5 s T2VA request at 832x480 and 1344x768. 5 s is 124 frames (H3 snaps to
+# 17n+5), which the VAE maps to 5n+2 = 37 latent frames; the DiT patch is
+# 1x2x2 on a /16 latent, so 37 * (H/32) * (W/32) = 14,430 or 37,296 video
+# tokens, plus 200 audio latents (40 Hz) and about 200 text tokens (prompt
+# dependent, assumed). See vllm_omni/diffusion/models/minimax_h3/time_request.py.
+TOKENS = (256, 1024, 4096, 14830, 37696)
 
 # Token-group sizes for the fused kernel. A group's intermediate h is
 # group * FFN * 2 bytes: 29 MB, 59 MB and 117 MB against a 128 MiB L2.
