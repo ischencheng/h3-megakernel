@@ -60,13 +60,18 @@ def main():
     parser.add_argument("--shapes", nargs="+", default=["1344x768"], help="one per process")
     parser.add_argument("--frames", type=int, default=124, help="17n+5; 124 is 5 s")
     parser.add_argument("--reps", type=int, default=3, help="the first run at each shape is a warmup")
+    parser.add_argument("--profile-rep", type=int, default=None,
+                        help="only this rep runs inside cudaProfilerStart/Stop, for nsys or ncu")
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
     os.environ.update(ENV)
+    if args.profile_rep is not None:
+        os.environ["FASTVIDEO_NVTX_PROFILE"] = "1"  # stage and block ranges
     peak = PeakMemory()
     peak.start()
 
+    import torch
     from fastvideo import VideoGenerator
     from huggingface_hub import snapshot_download
 
@@ -102,7 +107,11 @@ def main():
         w, h = map(int, shape.split("x"))
         for rep in range(args.reps):
             name = f"{shape}-r{rep}"
+            profile = rep == args.profile_rep
             peak.take()
+            if profile:
+                torch.cuda.synchronize()
+                torch.cuda.cudart().cudaProfilerStart()
             start = time.time()
             result = generator.generate({
                 "prompt": PROMPT,
@@ -110,6 +119,9 @@ def main():
                              "guidance_scale": 1.0, "seed": 1101, "fps": 24},
                 "output": {"output_path": str(OUT), "output_video_name": name, "return_frames": False},
             })
+            if profile:
+                torch.cuda.synchronize()
+                torch.cuda.cudart().cudaProfilerStop()
             row = {"shape": shape, "rep": rep, "client_s": time.time() - start, "peak_mib": peak.take(),
                    "generation_s": result.generation_time, "reported_peak_mb": result.peak_memory_mb,
                    "video_path": result.video_path}

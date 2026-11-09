@@ -1,5 +1,7 @@
+import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -30,10 +32,16 @@ image = (
     )
     # flashinfer needs nvidia-ml-py, and pynvml shadows it
     .run_commands("uv pip uninstall pynvml || true", "uv pip install --reinstall nvidia-ml-py")
+    .apt_install("cuda-nsight-systems-13-0", "cuda-nsight-compute-13-0")
     .env({"HF_HOME": "/cache/hf", "HF_XET_HIGH_PERFORMANCE": "1"})
     .add_local_dir(HERE, "/root/baseline", ignore=["**/__pycache__/**"])
 )
 app = modal.App("h3mk-fastvideo")
+
+
+def _tool(name):
+    return shutil.which(name) or sorted(glob.glob(f"/opt/nvidia/nsight-*/*/{name}") +
+                                        glob.glob(f"/opt/nvidia/nsight-*/*/bin/{name}"))[-1]
 
 
 @app.function(image=image, cpu=16, memory=32768, volumes={"/cache": volume}, timeout=7200, retries=1)
@@ -46,7 +54,7 @@ def download():
 
 @app.function(image=image, gpu="RTX-PRO-6000", cpu=(8, 32), memory=(131072, 393216),
               volumes={"/cache": volume}, timeout=7200, retries=0)
-def run(run_id: str, script: str, argv: list[str]):
+def run(run_id: str, script: str, argv: list[str], nsys: bool = False, ncu: str = ""):
     out = Path("/cache/runs") / run_id
     out.mkdir(parents=True, exist_ok=False)
     stop = threading.Event()
@@ -57,14 +65,27 @@ def run(run_id: str, script: str, argv: list[str]):
 
     threading.Thread(target=sync, daemon=True).start()
     env = {**os.environ, "OUT_DIR": str(out), "PYTHONUNBUFFERED": "1", "PYTHONPATH": "/root/baseline"}
+    cmd = [sys.executable, f"/root/baseline/{script}", *argv]
+    # both record only what runs between cudaProfilerStart and Stop (--profile-rep)
+    if nsys:
+        # gvisor has no perf_event_open, so no cpu sampling; node trace opens the vae's cuda graphs
+        cmd = [_tool("nsys"), "profile", "--trace=cuda,nvtx", "--sample=none", "--cpuctxsw=none",
+               "--cuda-graph-trace=node", "--capture-range=cudaProfilerApi", "--capture-range-end=stop",
+               "--output", str(out / "request"), *cmd]
+    elif ncu:
+        # modal cannot lock the gpu clocks
+        cmd = [_tool("ncu"), "--clock-control", "none", "--profile-from-start", "off",
+               "--export", str(out / "kernels"), *shlex.split(ncu), *cmd]
     with open(out / "driver.log", "w") as log:
-        proc = subprocess.Popen([sys.executable, f"/root/baseline/{script}", *argv], stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, env=env, text=True)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, text=True)
         for line in proc.stdout:
             log.write(line)
             log.flush()
             print(line, end="", flush=True)
         proc.wait()
+    if nsys and (out / "request.nsys-rep").exists():
+        subprocess.run([_tool("nsys"), "stats", "--report", "nvtx_gpu_proj_sum,cuda_gpu_kern_sum", "--format", "csv",
+                        "--output", str(out / "request"), str(out / "request.nsys-rep")])
     stop.set()
     (out / "returncode").write_text(str(proc.returncode))
     volume.commit()
@@ -72,5 +93,5 @@ def run(run_id: str, script: str, argv: list[str]):
 
 
 @app.local_entrypoint()
-def go(run_id: str, script: str = "fastvideo_capacity.py", args: str = ""):
-    print("returncode", run.remote(run_id, script, shlex.split(args)))
+def go(run_id: str, script: str = "fastvideo_capacity.py", args: str = "", nsys: bool = False, ncu: str = ""):
+    print("returncode", run.remote(run_id, script, shlex.split(args), nsys, ncu))
