@@ -130,7 +130,7 @@ OUT_DIR=/cache/runs/shell-<you> ncu --clock-control none --profile-from-start of
 
 Files under `/cache` are saved when you leave the shell and show up in `modal volume ls` a few seconds later. The shell ends as soon as your terminal disconnects, even in the middle of a command, so use `modal run --detach` from steps 2 and 5 for long runs. The GPU is billed while the shell is open, so exit when you are done.
 
-To profile your own script, copy three things from `baseline/fastvideo_modal.py`: install `cuda-nsight-systems-13-0` and `cuda-nsight-compute-13-0` in a CUDA 13.0 image, add the two gVisor options, and write the report to the Volume. For the M1 MLP harness, `modal run modal_run.py --ncu "<m1.run args>"` prints time and DRAM bytes per kernel as CSV.
+To profile your own script, copy three things from `baseline/fastvideo_modal.py`: install `cuda-nsight-systems-13-0` and `cuda-nsight-compute-13-0` in a CUDA 13.0 image, add the two gVisor options, and write the report to the Volume. A script in `baseline/` needs none of that: pass it to `go` with `--script`, and `--nsys` or `--ncu` work as above. For example, `--script fi_mlp_bench.py --args "--profile 4096" --nsys` records the MLP block from [Milestone 1](milestones/m1.md).
 
 ### Problems we hit
 

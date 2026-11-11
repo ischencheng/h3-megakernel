@@ -17,7 +17,7 @@ MiniMax-H3 turns a text prompt into video with sound. It has a text encoder, a D
 
 | Milestone | Date | Goal |
 |---|---|---|
-| [Milestone 1](docs/milestones/m1.md) | 11/11 | Profile the baseline, store reference tensors, begin the fused kernels |
+| [Milestone 1](docs/milestones/m1.md) | 11/11 | Profile the baseline, store reference tensors, run the DiT MLP block in one launch |
 | [Milestone 2](docs/milestones/m2.md) | 11/18 | Finish fusing the encoder, DiT and decoder, and measure each one |
 | [Milestone 3](docs/milestones/m3.md) | 11/30 | Integrate all stages into one megakernel |
 | [Final](docs/milestones/final.md) | 12/6 | Test different prompts and report the results |
@@ -28,10 +28,8 @@ The hand-offs between stages are in [docs/contract.md](docs/contract.md).
 
 ```
 docs/       milestones and the stage contract
-baseline/   runs FastVideo
-m1/         the DiT MLP harness
-csrc/       the DiT MLP kernels
-harness/    shared timing, error checks and Nsight
+baseline/   runs FastVideo, swaps our stages into it and benchmarks them
+harness/    checkpoint weights, the FP32 reference, error checks and the L2 flush
 stages/     text_encoder, dit, video_decoder, audio_decoder
 skeleton/   the final single launch
 results/    measured numbers

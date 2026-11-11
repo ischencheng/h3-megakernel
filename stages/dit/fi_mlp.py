@@ -45,7 +45,7 @@ def _scalar(t):
     return t.reshape(1).float().contiguous() if torch.is_tensor(t) else torch.tensor([float(t)], device="cuda")
 
 
-# checkpoint nvfp4 bytes (m1.weights.Linear fields) -> the operator's layout, no requantization
+# checkpoint nvfp4 bytes (harness.weights.Linear fields) -> the operator's layout, no requantization
 def pack(fc1, fc2):
     w1, s1 = fc1.w.view(torch.uint8), fc1.s.view(torch.uint8)
     cols = s1.numel() // (2 * FFN)

@@ -1,4 +1,4 @@
-"""FlashInfer's MLP block in three launches vs in one launch (m1/fi_mlp.py), on block 0's weights.
+"""FlashInfer's MLP block in three launches vs in one launch (stages/dit/fi_mlp.py), on block 0's weights.
 
 Both must give bitwise the same output. The two take turns in each timed round, so clock drift on the unlocked
 GPU hits them alike, and each round is compared as a pair. The one-launch build also records when each CTA ended
@@ -32,7 +32,7 @@ def inputs(tokens, seed=0):
 def interleaved(names, call, iters, warmup=3):
     import torch
 
-    from m1 import bench
+    from harness import bench
 
     flusher = bench.L2Flusher()
     for _ in range(warmup):
@@ -120,7 +120,8 @@ def main():
 
     import torch
 
-    from m1 import fi_mlp, weights
+    from harness import weights
+    from stages.dit import fi_mlp
 
     w = weights.load("cuda")
     p = fi_mlp.pack(w.fc1, w.fc2)

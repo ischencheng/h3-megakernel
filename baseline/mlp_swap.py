@@ -8,7 +8,7 @@ The other arms keep the first call for its residual update, skip the feed-forwar
 RMSNorm, AdaLN, FC1, SwiGLU, FC2 and the gated residual on the checkpoint's own NVFP4 bytes repacked to
 FlashInfer's layout:
   flashinfer_mlp   flashinfer.diffusion_ops.minimax_h3_mlp_nvfp4_sm120, three launches
-  mlp_one_launch   the same kernels as one persistent launch (m1/fi_mlp.py)
+  mlp_one_launch   the same kernels as one persistent launch (stages/dit/fi_mlp.py)
 """
 import time
 
@@ -16,7 +16,8 @@ import torch
 from fastvideo.layers.quantization.nvfp4_config import H3_NVFP4_DIT_INPUT_SF_NAME
 from fastvideo.models.dits import minimax_h3
 
-from m1 import check, fi_mlp, reference, weights
+from harness import check, reference, weights
+from stages.dit import fi_mlp
 
 ARMS = ("fastvideo", "flashinfer_mlp", "mlp_one_launch")
 _FUSED = minimax_h3.fused_residual_gate_rmsnorm_modulate

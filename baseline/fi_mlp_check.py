@@ -6,7 +6,8 @@ import time
 import torch
 
 from fi_mlp_bench import EPS, inputs
-from m1 import fi_mlp, weights
+from harness import weights
+from stages.dit import fi_mlp
 
 
 def main():

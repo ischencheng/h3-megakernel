@@ -33,10 +33,11 @@ image = (
     # flashinfer needs nvidia-ml-py, and pynvml shadows it
     .run_commands("uv pip uninstall pynvml || true", "uv pip install --reinstall nvidia-ml-py")
     .apt_install("cuda-nsight-systems-13-0", "cuda-nsight-compute-13-0")
-    .run_commands("uv pip install ninja")  # flashinfer's jit builds the one-launch mlp (m1/fi_mlp.py)
+    .run_commands("uv pip install ninja")  # flashinfer's jit builds the one-launch mlp (stages/dit/fi_mlp.py)
     .env({"HF_HOME": "/cache/hf", "HF_XET_HIGH_PERFORMANCE": "1", "H3MK_DATA": "/tmp/h3mk-data"})
     .add_local_dir(HERE, "/root/baseline", ignore=["**/__pycache__/**"])
-    .add_local_dir(HERE.parent / "m1", "/root/h3mk/m1", ignore=["**/__pycache__/**"])
+    .add_local_dir(HERE.parent / "harness", "/root/h3mk/harness", ignore=["**/__pycache__/**"])
+    .add_local_dir(HERE.parent / "stages", "/root/h3mk/stages", ignore=["**/__pycache__/**"])
 )
 app = modal.App("h3mk-fastvideo")
 

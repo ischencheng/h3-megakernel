@@ -1,17 +1,10 @@
 import torch
 import torch.nn.functional as F
-from flashinfer import SfLayout, mm_fp4, nvfp4_quantize
 
 from . import config
 
 # e2m1 by nibble, bit 3 is the sign
 _E2M1 = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, -0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0)
-
-
-def make_input(tokens, device="cuda"):
-    gen = torch.Generator(device=device).manual_seed(config.SEED + tokens)
-    x = torch.randn(tokens, config.HIDDEN, generator=gen, device=device, dtype=torch.float32)
-    return x.to(torch.bfloat16)
 
 
 # up first, then gate
@@ -45,21 +38,3 @@ def mlp_fp32(x, w, rows_per_chunk=4096):
         return out
     finally:
         torch.backends.cuda.matmul.allow_tf32 = prev
-
-
-@torch.compile
-def _swiglu_bf16(h):
-    # one fused kernel, one bf16 rounding
-    up, gate = h.chunk(2, dim=-1)
-    return (up.float() * F.silu(gate.float())).to(torch.bfloat16)
-
-
-def _fp4_gemm(x, layer):
-    x_fp4, x_scale = nvfp4_quantize(x, layer.input_sf, sfLayout=SfLayout.layout_128x4, do_shuffle=False)
-    return mm_fp4(x_fp4, layer.w.t(), x_scale, layer.s.t(), layer.alpha / layer.input_sf, torch.bfloat16, None,
-                  backend="cutlass")
-
-
-@torch.no_grad()
-def mlp_flashinfer(x, w):
-    return _fp4_gemm(_swiglu_bf16(_fp4_gemm(x, w.fc1)), w.fc2)
