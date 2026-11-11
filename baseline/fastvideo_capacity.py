@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -44,6 +45,13 @@ ENV = {
 }
 
 
+def psnr(a, b):
+    err = subprocess.run(["ffmpeg", "-i", a, "-i", b, "-lavfi", "psnr", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    found = re.findall(r"average:(\S+)", err)
+    return found[-1] if found else None
+
+
 def describe(folder, name, video_path):
     row = {}
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", "2", "-i", video_path, "-frames:v", "1",
@@ -61,7 +69,12 @@ def main():
     parser.add_argument("--frames", type=int, default=124, help="17n+5; 124 is 5 s")
     parser.add_argument("--reps", type=int, default=3, help="the first run at each shape is a warmup")
     parser.add_argument("--profile-rep", type=int, default=None,
-                        help="only this rep runs inside cudaProfilerStart/Stop, for nsys or ncu")
+                        help="only this rep runs inside cudaProfilerStart/Stop, for nsys or ncu; "
+                             "with --arms, every arm after the warmup does")
+    parser.add_argument("--arms", nargs="+", default=None,
+                        help="after one warmup, one request per arm of mlp_swap.py: fastvideo, flashinfer_mlp, "
+                             "mlp_one_launch")
+    parser.add_argument("--check-calls", type=int, default=3, help="MLP calls checked against fp32 per arm")
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -103,15 +116,30 @@ def main():
           f"resident {summary['resident_mib']} MiB", flush=True)
     path.write_text(json.dumps(summary, indent=1))
 
+    swap = None
+    if args.arms:
+        import mlp_swap
+
+        swap = mlp_swap.MlpSwap(args.check_calls)
     for shape in args.shapes:
         w, h = map(int, shape.split("x"))
-        for rep in range(args.reps):
-            name = f"{shape}-r{rep}"
-            profile = rep == args.profile_rep
+        if args.arms:
+            runs = [(f"{shape}-warmup", "fastvideo")] + [(f"{shape}-{arm}", arm) for arm in args.arms]
+        else:
+            runs = [(f"{shape}-r{rep}", None) for rep in range(args.reps)]
+        videos = {}
+        for rep, (name, arm) in enumerate(runs):
+            if args.arms:
+                profile = args.profile_rep is not None and rep > 0
+                swap.set_arm(arm)
+            else:
+                profile = rep == args.profile_rep
             peak.take()
-            if profile:
+            if profile and (not args.arms or rep == 1):
                 torch.cuda.synchronize()
                 torch.cuda.cudart().cudaProfilerStart()
+            if arm:
+                torch.cuda.nvtx.range_push(f"arm.{arm}")
             start = time.time()
             result = generator.generate({
                 "prompt": PROMPT,
@@ -119,16 +147,25 @@ def main():
                              "guidance_scale": 1.0, "seed": 1101, "fps": 24},
                 "output": {"output_path": str(OUT), "output_video_name": name, "return_frames": False},
             })
-            if profile:
-                torch.cuda.synchronize()
+            torch.cuda.synchronize()
+            client_s = time.time() - start
+            if arm:
+                torch.cuda.nvtx.range_pop()
+            if profile and (not args.arms or rep == len(runs) - 1):
                 torch.cuda.cudart().cudaProfilerStop()
-            row = {"shape": shape, "rep": rep, "client_s": time.time() - start, "peak_mib": peak.take(),
+            row = {"shape": shape, "rep": rep, "client_s": client_s, "peak_mib": peak.take(),
                    "generation_s": result.generation_time, "reported_peak_mb": result.peak_memory_mb,
                    "video_path": result.video_path}
             stages = getattr(result.logging_info, "stages", None) or {}
             row["stages"] = {key: value.get("execution_time") for key, value in stages.items()}
             if result.video_path:
                 row.update(describe(OUT, name, result.video_path))
+            if arm:
+                row.update(swap.report())
+                row["client_s_without_checks"] = client_s - row["check_s"]
+                videos[arm] = result.video_path
+                if rep > 0 and "fastvideo" in videos and arm != "fastvideo" and result.video_path:
+                    row["psnr_vs_fastvideo"] = psnr(videos["fastvideo"], result.video_path)
             summary["runs"].append(row)
             print(json.dumps(row), flush=True)
             path.write_text(json.dumps(summary, indent=1))

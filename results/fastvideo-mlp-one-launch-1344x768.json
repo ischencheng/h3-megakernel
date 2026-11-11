@@ -1,0 +1,233 @@
+{
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition, 97887 MiB, 610.57.04",
+ "model": "FastVideo/FastVideo-FastH3-8-Step-V2-NVFP4-Consumer",
+ "revision": "9d0d0d3ae69365aded83fab5562f00f9f06c12aa",
+ "env": {
+  "FASTVIDEO_H3_VSA_FP4": "1",
+  "FASTVIDEO_MINIMAX_H3_FUSIONS": "all",
+  "FASTVIDEO_NVFP4_MM_BACKEND": "cutlass",
+  "FASTVIDEO_H3_VAE_TILE_BATCH": "28",
+  "FASTVIDEO_STAGE_LOGGING": "1"
+ },
+ "runs": [
+  {
+   "shape": "1344x768",
+   "rep": 0,
+   "arm": "fastvideo",
+   "client_s": 262.2347321510315,
+   "client_s_without_checks": 262.2347321510315,
+   "peak_mib": 71208,
+   "stages": {
+    "input_preparation_stage": 5.7936000004588095e-05,
+    "conditioning_stage": 119.372272484,
+    "latent_preparation_stage": 0.012312516999998024,
+    "denoising_stage": 47.78894625500001,
+    "video_decoding_stage": 94.41665877199998,
+    "audio_decoding_stage": 0.14243723399999908,
+    "PostDecodeFrameProcessStage": 0.026742259999991802,
+    "VideoSaveStage": 0.4251235120000274,
+    "AudioMuxStage": 0.0
+   },
+   "mlp_calls": 400,
+   "mlp_section_ms_total": 28130.730937957764,
+   "residual_norm_ms_total": 564.5246438980103,
+   "mlp_only_ms_total": 27566.206294059753,
+   "check_s": 0.0,
+   "checks": []
+  },
+  {
+   "shape": "1344x768",
+   "rep": 1,
+   "arm": "fastvideo",
+   "client_s": 30.84026050567627,
+   "client_s_without_checks": 30.84026050567627,
+   "peak_mib": 71732,
+   "stages": {
+    "input_preparation_stage": 7.085499998993328e-05,
+    "conditioning_stage": 0.09340328500002215,
+    "latent_preparation_stage": 0.01276651400002038,
+    "denoising_stage": 25.765703987999984,
+    "video_decoding_stage": 4.4461757110000235,
+    "audio_decoding_stage": 0.04925630299999284,
+    "PostDecodeFrameProcessStage": 0.026731655999981285,
+    "VideoSaveStage": 0.4116549650000252,
+    "AudioMuxStage": 0.0
+   },
+   "mlp_calls": 400,
+   "mlp_section_ms_total": 6939.804597854614,
+   "residual_norm_ms_total": 436.6100175380707,
+   "mlp_only_ms_total": 6503.194580316544,
+   "check_s": 0.0,
+   "checks": []
+  },
+  {
+   "shape": "1344x768",
+   "rep": 2,
+   "arm": "flashinfer_mlp",
+   "client_s": 30.296291828155518,
+   "client_s_without_checks": 29.125720977783203,
+   "peak_mib": 76778,
+   "stages": {
+    "input_preparation_stage": 7.08250000229782e-05,
+    "conditioning_stage": 0.08340349799999558,
+    "latent_preparation_stage": 0.01152541400000473,
+    "denoising_stage": 25.197154538999996,
+    "video_decoding_stage": 4.452393124000025,
+    "audio_decoding_stage": 0.057418882000035865,
+    "PostDecodeFrameProcessStage": 0.026428037000016502,
+    "VideoSaveStage": 0.4319908420000047,
+    "AudioMuxStage": 0.0
+   },
+   "mlp_calls": 400,
+   "mlp_section_ms_total": 5172.604711532593,
+   "residual_norm_ms_total": 435.7628780603409,
+   "mlp_only_ms_total": 4736.841833472252,
+   "check_s": 1.1705708503723145,
+   "checks": [
+    {
+     "call": 0,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.3651919992877211,
+      "max_over_rms": 4964.504215222923
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.3675423888190672,
+      "max_over_rms": 5000.386036329689
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.019103102389829534,
+      "max_over_rms": 46.658440407755506
+     },
+     "equals_three_launches": true,
+     "passes": true
+    },
+    {
+     "call": 1,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.049582712558391265,
+      "max_over_rms": 358.91869584132974
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.04972945980516506,
+      "max_over_rms": 365.18802639422563
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.01716699129522247,
+      "max_over_rms": 6.334010256154693
+     },
+     "equals_three_launches": true,
+     "passes": true
+    },
+    {
+     "call": 2,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.040766841369507756,
+      "max_over_rms": 11.797687390884478
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.040506784132101514,
+      "max_over_rms": 10.706719255641278
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.022960194360323483,
+      "max_over_rms": 8.663443843706297
+     },
+     "equals_three_launches": true,
+     "passes": true
+    }
+   ]
+  },
+  {
+   "shape": "1344x768",
+   "rep": 3,
+   "arm": "mlp_one_launch",
+   "client_s": 30.25953245162964,
+   "client_s_without_checks": 29.095978498458862,
+   "peak_mib": 76778,
+   "stages": {
+    "input_preparation_stage": 5.008499999803462e-05,
+    "conditioning_stage": 0.0859481950000145,
+    "latent_preparation_stage": 0.011873411000010492,
+    "denoising_stage": 25.177533194999967,
+    "video_decoding_stage": 4.452009187999977,
+    "audio_decoding_stage": 0.047208599999976286,
+    "PostDecodeFrameProcessStage": 0.026706481000019267,
+    "VideoSaveStage": 0.42114568199997393,
+    "AudioMuxStage": 0.0
+   },
+   "mlp_calls": 400,
+   "mlp_section_ms_total": 5135.060062408447,
+   "residual_norm_ms_total": 435.5729923248291,
+   "mlp_only_ms_total": 4699.487070083618,
+   "check_s": 1.1635539531707764,
+   "checks": [
+    {
+     "call": 0,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.3651919992877211,
+      "max_over_rms": 4964.504215222923
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.3675423888190672,
+      "max_over_rms": 5000.386036329689
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.019103102389829534,
+      "max_over_rms": 46.658440407755506
+     },
+     "equals_three_launches": true,
+     "passes": true
+    },
+    {
+     "call": 1,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.049582712558391265,
+      "max_over_rms": 358.91869584132974
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.04972945980516506,
+      "max_over_rms": 365.18802639422563
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.01716699129522247,
+      "max_over_rms": 6.334010256154693
+     },
+     "equals_three_launches": true,
+     "passes": true
+    },
+    {
+     "call": 2,
+     "tokens": 37730,
+     "table_rows": 6,
+     "branch_vs_fp32": {
+      "rel_l2": 0.040766841369507756,
+      "max_over_rms": 11.797687390884478
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.040506784132101514,
+      "max_over_rms": 10.706719255641278
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.022960194360323483,
+      "max_over_rms": 8.663443843706297
+     },
+     "equals_three_launches": true,
+     "passes": true
+    }
+   ]
+  }
+ ],
+ "startup_s": 43.05092167854309,
+ "loaded_peak_mib": 55874,
+ "resident_mib": 58274
+}
