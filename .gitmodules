@@ -1,0 +1,7 @@
+[submodule "third_party/HuggingArch"]
+	path = third_party/HuggingArch
+	url = https://github.com/ischencheng/HuggingArch.git
+	branch = feat/minimax-h3-diffusion-pipeline
+[submodule "FastVideo"]
+	path = FastVideo
+	url = https://github.com/hao-ai-lab/FastVideo.git
