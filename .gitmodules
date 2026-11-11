@@ -4,4 +4,5 @@
 	branch = feat/minimax-h3-diffusion-pipeline
 [submodule "FastVideo"]
 	path = FastVideo
-	url = https://github.com/hao-ai-lab/FastVideo.git
+	url = https://github.com/nshejwalkar/FastVideo.git
+	branch = h3-megakernel
