@@ -92,8 +92,8 @@ def plot(row, gpu):
            f'on one {gpu} (one row per CTA)</text>']
     for i, (kind, label) in enumerate((("norm", "norm"), ("fc1", "FC1 + SwiGLU"), ("fc2", "FC2 + residual"))):
         x = w - 330 + i * 100
-        out.append(f'<rect x="{x}" y="12" width="12" height="12" fill="{COLORS[kind]}"/>'
-                   f'<text x="{x + 16}" y="22">{label}</text>')
+        out.append(f'<rect x="{x}" y="42" width="12" height="12" fill="{COLORS[kind]}"/>'
+                   f'<text x="{x + 16}" y="52">{label}</text>')  # beside the first panel's title
     _panel(out, rows, 0, end, 60, 230, left, width, f"whole launch: {end:.0f} us (time in us)")
     pad = (hi - lo) * 0.6 + 20
     _panel(out, rows, lo - pad, hi + pad, 360, 230, left, width,
