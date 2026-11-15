@@ -60,12 +60,20 @@ def main():
     parser.add_argument("--shapes", nargs="+", default=["1344x768"], help="one per process")
     parser.add_argument("--frames", type=int, default=124, help="17n+5; 124 is 5 s")
     parser.add_argument("--reps", type=int, default=3, help="the first run at each shape is a warmup")
+    parser.add_argument("--fp4-attention", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--prompts", help="JSON list of prompt strings; overrides --reps")
+    parser.add_argument("--seeds", type=int, nargs="+", default=[1101])
     parser.add_argument("--profile-rep", type=int, default=None,
                         help="only this rep runs inside cudaProfilerStart/Stop, for nsys or ncu")
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
-    os.environ.update(ENV)
+    env = {**ENV, "FASTVIDEO_H3_VSA_FP4": str(args.fp4_attention)}
+    os.environ.update(env)
+    prompts = json.loads(Path(args.prompts).read_text()) if args.prompts else [PROMPT]
+    cases = [(i, prompt, seed) for i, prompt in enumerate(prompts) for seed in args.seeds]
+    if not args.prompts:
+        cases *= args.reps
     if args.profile_rep is not None:
         os.environ["FASTVIDEO_NVTX_PROFILE"] = "1"  # stage and block ranges
     peak = PeakMemory()
@@ -78,7 +86,7 @@ def main():
     gpu = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"],
                          capture_output=True, text=True).stdout.strip()
     print("GPU:", gpu, flush=True)
-    summary = {"gpu": gpu, "model": MODEL, "revision": REVISION, "env": ENV, "runs": []}
+    summary = {"gpu": gpu, "model": MODEL, "revision": REVISION, "env": env, "runs": []}
     path = OUT / "summary.json"
 
     start = time.time()
@@ -105,7 +113,7 @@ def main():
 
     for shape in args.shapes:
         w, h = map(int, shape.split("x"))
-        for rep in range(args.reps):
+        for rep, (prompt_id, prompt, seed) in enumerate(cases):
             name = f"{shape}-r{rep}"
             profile = rep == args.profile_rep
             peak.take()
@@ -114,15 +122,16 @@ def main():
                 torch.cuda.cudart().cudaProfilerStart()
             start = time.time()
             result = generator.generate({
-                "prompt": PROMPT,
+                "prompt": prompt,
                 "sampling": {"height": h, "width": w, "num_frames": args.frames, "num_inference_steps": 9,
-                             "guidance_scale": 1.0, "seed": 1101, "fps": 24},
+                             "guidance_scale": 1.0, "seed": seed, "fps": 24},
                 "output": {"output_path": str(OUT), "output_video_name": name, "return_frames": False},
             })
             if profile:
                 torch.cuda.synchronize()
                 torch.cuda.cudart().cudaProfilerStop()
-            row = {"shape": shape, "rep": rep, "client_s": time.time() - start, "peak_mib": peak.take(),
+            row = {"shape": shape, "rep": rep, "prompt_id": prompt_id, "prompt": prompt, "seed": seed,
+                   "cold": rep == 0, "client_s": time.time() - start, "peak_mib": peak.take(),
                    "generation_s": result.generation_time, "reported_peak_mb": result.peak_memory_mb,
                    "video_path": result.video_path}
             stages = getattr(result.logging_info, "stages", None) or {}

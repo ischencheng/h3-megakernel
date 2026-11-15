@@ -55,6 +55,10 @@ def download():
 @app.function(image=image, gpu="RTX-PRO-6000", cpu=(8, 32), memory=(131072, 393216),
               volumes={"/cache": volume}, timeout=7200, retries=0)
 def run(run_id: str, script: str, argv: list[str], nsys: bool = False, ncu: str = ""):
+    return run_script(run_id, script, argv, nsys, ncu)
+
+
+def run_script(run_id: str, script: str, argv: list[str], nsys: bool = False, ncu: str = ""):
     out = Path("/cache/runs") / run_id
     out.mkdir(parents=True, exist_ok=False)
     stop = threading.Event()
