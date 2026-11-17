@@ -1,12 +1,5 @@
-"""Run the video decoder's transformer blocks on the fused kernels in stages/video_decoder.
-
-FastVideo compiles the decoder's forward with inductor (engine.compile.vae_enabled) and calls it from the eager
-tile driver AutoencoderKLMiniMaxH3._decode_clip. The fused arm swaps that forward for decoder_forward below for the
-length of each _decode_clip call: the same code with the block loop on fused_block.forward, run eagerly. Every
-other stage, and the fastvideo arm, stays as FastVideo runs it.
-  fastvideo   FastVideo's compiled decoder
-  fused       the blocks on fused_block (8 kernels per block instead of about 40)
-"""
+# swaps the video decoder's blocks for stages/video_decoder; fastvideo compiles the decoder forward,
+# so the fused arm runs a copy of it with the fused blocks, eagerly, for each _decode_clip call
 import os
 import time
 
@@ -20,8 +13,8 @@ ARMS = ("fastvideo", "fused")
 _DECODE_CLIP = vae.AutoencoderKLMiniMaxH3._decode_clip
 
 
+# MiniMaxH3VideoViTDecoder3d.forward with the fused blocks
 def decoder_forward(dec, packed, hidden_states, checker=None):
-    """MiniMaxH3VideoViTDecoder3d.forward with the blocks on the fused kernels."""
     batch_size, num_channels, num_frames, height, width = hidden_states.shape
     hidden_states = hidden_states.permute(0, 2, 3, 4, 1).reshape(batch_size, num_frames * height * width, num_channels)
     hidden_states = dec.proj_in(hidden_states)
@@ -40,7 +33,7 @@ def decoder_forward(dec, packed, hidden_states, checker=None):
     for index, block in enumerate(dec.transformer_blocks):
         checked = checker is not None and index in checker.check_blocks
         block_in = hidden_states.clone() if checked else None
-        # the loop owns its residual stream: the concatenation above is a new fp32 tensor
+        # in place is safe, the concatenation above made a new fp32 tensor
         hidden_states = fused_block.forward(block, packed[index], hidden_states, rotary_emb, inplace=True)
         if checked:
             checker.check(index, block, block_in, rotary_emb, hidden_states)
@@ -56,10 +49,10 @@ def decoder_forward(dec, packed, hidden_states, checker=None):
 class VaeSwap:
 
     def __init__(self, check_blocks=(0, 1, 13, 25)):
-        # H3MK_VAE_CHECK=0 skips the checks, for runs that measure memory
+        # H3MK_VAE_CHECK=0 skips the checks, for memory runs
         self.check_blocks = tuple(check_blocks) if os.environ.get("H3MK_VAE_CHECK", "1") != "0" else ()
         self.packed = None
-        self.checked = False  # the blocks are checked on the first fused request only, which is not timed
+        self.checked = False  # only the first fused request runs the checks
         self.set_arm("fastvideo")
         swap = self
         vae.AutoencoderKLMiniMaxH3._decode_clip = lambda module, z: swap.decode_clip(module, z)
@@ -73,12 +66,12 @@ class VaeSwap:
         dec = module.decoder
         if self.packed is None:  # during the warmup, so neither the build nor the packing is timed
             self.packed = [fused_block.Packed(b) for b in dec.transformer_blocks]
-            fused_block.ext().set_gemm_stages(int(os.environ.get("H3MK_GEMM_STAGES", "3")))
+            fused_block.ext()
         start.record()
         if self.arm == "fastvideo":
             out = _DECODE_CLIP(module, z)
         else:
-            # the first clip is a single latent frame, so check the blocks on the second, a full one
+            # the first clip is one latent frame, so check on the second
             checker = self if self.calls == 1 and not self.checked and self.check_blocks else None
             compiled = dec.__dict__.get("forward")
             dec.forward = lambda x: decoder_forward(dec, self.packed, x, checker)
@@ -95,7 +88,7 @@ class VaeSwap:
         self.calls += 1
         return out
 
-    # one block on the same input: ours and FastVideo's eager block, both against fp32
+    # ours and fastvideo's eager block on the same input, both against fp32
     @torch.no_grad()
     def check(self, index, block, block_in, rotary_emb, ours):
         torch.cuda.synchronize()

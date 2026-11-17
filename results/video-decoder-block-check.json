@@ -79,25 +79,19 @@
     "max_over_rms": 0.10301937579825274
    },
    "passes": true,
-   "three_stages_equal": true,
    "ms": {
-    "rowquant_norm_2048": 0.3993600010871887,
-    "rowquant_8192": 1.035264015197754,
-    "gemm_qkv_6st": 2.8538880348205566,
-    "gemm_residual_2048_6st": 0.8791040182113647,
-    "gemm_swiglu_6st": 5.6145920753479,
-    "gemm_residual_8192_6st": 2.3152639865875244,
-    "ours_block_6st": 16.228351593017578,
-    "gemm_qkv_3st": 1.8483200073242188,
-    "gemm_residual_2048_3st": 0.7812959849834442,
-    "gemm_swiglu_3st": 4.513792037963867,
-    "gemm_residual_8192_3st": 2.2231040000915527,
-    "ours_block_3st": 14.192639827728271,
-    "int_mm_qkv_3x": 1.9517439603805542,
-    "int_mm_w1": 5.094399929046631,
-    "fastvideo_quantize_input": 2.2727359533309937,
-    "fastvideo_block_eager": 101.31043243408203,
-    "fastvideo_block_inductor": 24.978431701660156
+    "rowquant_norm_2048": 0.3983359932899475,
+    "rowquant_8192": 0.9855839908123016,
+    "gemm_qkv": 1.7889280319213867,
+    "gemm_residual_2048": 0.7710719704627991,
+    "gemm_swiglu": 4.3822081089019775,
+    "gemm_residual_8192": 2.2099039554595947,
+    "ours_block": 14.163967609405518,
+    "int_mm_qkv_3x": 1.9537919759750366,
+    "int_mm_w1": 5.089792013168335,
+    "fastvideo_quantize_input": 2.263535976409912,
+    "fastvideo_block_eager": 99.37612915039062,
+    "fastvideo_block_inductor": 24.369664192199707
    }
   },
   {
@@ -177,25 +171,19 @@
     "max_over_rms": 0.07331805136629548
    },
    "passes": true,
-   "three_stages_equal": true,
    "ms": {
     "rowquant_norm_2048": 0.3973119854927063,
-    "rowquant_8192": 1.033728003501892,
-    "gemm_qkv_6st": 2.736128091812134,
-    "gemm_residual_2048_6st": 0.8345440030097961,
-    "gemm_swiglu_6st": 5.586031913757324,
-    "gemm_residual_8192_6st": 2.2609920501708984,
-    "ours_block_6st": 16.226303100585938,
-    "gemm_qkv_3st": 1.807360053062439,
-    "gemm_residual_2048_3st": 0.7730879783630371,
-    "gemm_swiglu_3st": 4.443455934524536,
-    "gemm_residual_8192_3st": 2.2295039892196655,
-    "ours_block_3st": 14.237680435180664,
-    "int_mm_qkv_3x": 1.9599360227584839,
-    "int_mm_w1": 5.1220479011535645,
-    "fastvideo_quantize_input": 2.2640318870544434,
-    "fastvideo_block_eager": 100.0970230102539,
-    "fastvideo_block_inductor": 24.211456298828125
+    "rowquant_8192": 0.984063982963562,
+    "gemm_qkv": 1.7909760475158691,
+    "gemm_residual_2048": 0.7676160037517548,
+    "gemm_swiglu": 4.365087985992432,
+    "gemm_residual_8192": 2.2128639221191406,
+    "ours_block": 14.201856136322021,
+    "int_mm_qkv_3x": 1.9527679681777954,
+    "int_mm_w1": 5.092864036560059,
+    "fastvideo_quantize_input": 2.26198410987854,
+    "fastvideo_block_eager": 99.378173828125,
+    "fastvideo_block_inductor": 24.52787208557129
    }
   }
  ]

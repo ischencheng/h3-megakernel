@@ -1,9 +1,4 @@
-"""Draw the video decoder charts from the run summaries.
-
-  python baseline/vae_plot.py --requests <summary.json>... --block <vae_block_check.json> --out results/
-writes video-decoder-request.svg (decoder stage and whole request, FastVideo against the fused blocks, per shape)
-and video-decoder-block.svg (one decoder block, FastVideo's kernels against ours).
-"""
+# draws video-decoder-request.svg and video-decoder-block.svg from the run summaries
 import argparse
 import json
 from pathlib import Path
@@ -13,7 +8,7 @@ LABELS = {"fastvideo": "FastVideo", "fused": "fused blocks"}
 
 
 def _bars(out, groups, top, height, left, width, title, unit):
-    """groups: [(label, {arm: value})]; one cluster of bars per group, values labelled on top"""
+    # groups: [(label, {arm: value})], one cluster of bars per group
     peak = max(v for _, arms in groups for v in arms.values()) * 1.15
     out.append(f'<text x="{left}" y="{top - 12}" font-size="14">{title}</text>')
     out.append(f'<line x1="{left}" y1="{top + height}" x2="{left + width}" y2="{top + height}" stroke="#333"/>')
@@ -58,9 +53,9 @@ def request_chart(summaries):
 
 
 def block_chart(check):
-    row = check["blocks"][-1]["ms"]
-    ours = min(v for k, v in row.items() if k.startswith("ours_block"))
-    groups = [("one block", {"fastvideo": row["fastvideo_block_inductor"], "fused": ours})]
+    block = check["blocks"][0]
+    row = block["ms"]
+    groups = [(f"block {block['block']}", {"fastvideo": row["fastvideo_block_inductor"], "fused": row["ours_block"]})]
     body = []
     _bars(body, groups, 70, 220, 60, 300, f"One decoder block, {check['tiles']} tiles of {check['tokens_per_tile']} "
           "tokens (ms)", " ms")

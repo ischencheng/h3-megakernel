@@ -1,13 +1,4 @@
-// Fused kernels for the H3 video decoder blocks.
-//
-// FastVideo runs each INT8 ConvRot linear of a decoder block as
-//   fp16 GEMM with the 256x256 Hadamard (rotation)
-//   row amax, scale and round to int8 (quantize)
-//   int8 GEMM to an int32 matrix (cuBLAS)
-//   int32 * x_scale * w_scale + bias, then whatever follows (inductor)
-// Here the norm, rotation and quantize of a row are one kernel (rowquant), and the dequant and what follows
-// it are the epilogue of the int8 GEMM, so the fp16 rotation output and the int32 matrix never reach memory.
-// The GEMM mainloop is CUTLASS's SM80 int8 mainloop with the 128x128x64 tile cuBLAS picks for these shapes.
+// fused kernels for the h3 video decoder blocks
 
 #include <cuda_fp16.h>
 #include <torch/extension.h>
@@ -19,21 +10,19 @@
 
 namespace h3mk {
 
-// ---------------------------------------------------------------------------------------------------------------
-// rowquant: optional RMSNorm, then the Hadamard rotation in groups of 256, then per-row int8 quantization
-// ---------------------------------------------------------------------------------------------------------------
+// rowquant: optional rmsnorm, hadamard rotation in groups of 256, int8 quantize
 
 constexpr int kRowThreads = 128;
-constexpr int kChunk = 16;  // consecutive elements per thread, two base-4 digits of a 256 group
+constexpr int kChunk = 16;  // consecutive elements per thread
 
-// h4 = [[1,1,1,-1],[1,1,-1,1],[1,-1,1,1],[-1,1,1,1]]: y_a = sum_b h4[a][b] x_b = (x0+x1+x2+x3) - 2 x_(3-a)
+// y = h4 x, h4 = [[1,1,1,-1],[1,1,-1,1],[1,-1,1,1],[-1,1,1,1]]
 __device__ __forceinline__ void h4(float& x0, float& x1, float& x2, float& x3) {
     float s = (x0 + x1) + (x2 + x3);
     float y0 = s - 2.f * x3, y1 = s - 2.f * x2, y2 = s - 2.f * x1, y3 = s - 2.f * x0;
     x0 = y0; x1 = y1; x2 = y2; x3 = y3;
 }
 
-// the same transform across the four lanes that differ in the bits of `step` (1 or 4) times 0..3
+// the same transform across the 4 lanes that differ in bits shift and shift + 1
 __device__ __forceinline__ float h4_lanes(float x, int lane, int shift) {
     int a = (lane >> shift) & 3, base = lane & ~(3 << shift);
     float v0 = __shfl_sync(0xffffffffu, x, base);
@@ -97,10 +86,8 @@ __device__ __forceinline__ float block_max(float x, float* red) {
     return total;
 }
 
-// One CTA per row. Each thread holds kChunk consecutive elements of a 256 group per step; the 16 lanes of a
-// half-warp hold the 16 chunks of one group, so the two high base-4 digits of the rotation are lane shuffles.
-// FastVideo's arithmetic, in the eager dtypes: norm in fp32 rounded to fp16 (autocast feeds the rotation
-// GEMM fp16), the rotation summed in fp32 and rounded to fp16, scale = fp16(amax / 127), q = round(fp16(x / scale)).
+// one cta per row; the 16 lanes of a half-warp hold one 256 group
+// rounds like fastvideo's eager path: fp16 norm, fp16 rotation, scale = fp16(amax / 127)
 template <typename T, int K, bool kNorm>
 __global__ void __launch_bounds__(kRowThreads) rowquant_kernel(const T* __restrict__ x, const float* __restrict__ w,
                                                               float eps, int8_t* __restrict__ q,
@@ -166,9 +153,7 @@ __global__ void __launch_bounds__(kRowThreads) rowquant_kernel(const T* __restri
     if (threadIdx.x == 0) scale[row] = s16;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// int8 GEMM, D = A[M,K] * W[N,K]^T, CUTLASS SM80 mainloop, epilogue on the accumulator registers
-// ---------------------------------------------------------------------------------------------------------------
+// int8 gemm d = a * w^t: cutlass sm80 mainloop, our epilogue on the accumulator registers
 
 constexpr int kTileM = 128, kTileN = 128, kTileK = 64, kGemmThreads = 128;
 
@@ -191,26 +176,25 @@ struct Operands {
     int m, n, k;
 };
 
-// dequant exactly as FastVideo's eager path: (acc * x_scale) * w_scale + bias, each rounded
+// (acc * x_scale) * w_scale + bias, rounded like fastvideo's eager dequant
 __device__ __forceinline__ float dq(int acc, float xs, float ws, float b) {
     return __fadd_rn(__fmul_rn(__fmul_rn(static_cast<float>(acc), xs), ws), b);
 }
 
-// q, k: RMSNorm over the 64-channel head without affine, then rotate-half RoPE on the first 48 channels with
-// the eager rounding (a*cos + rotated*sin); v: dequant and bias. All three are written fp16 for the attention.
+// q, k: head rmsnorm, then rope on the first 48 channels; v: dequant only
 struct QkvEpilogue {
     __half* q; __half* k; __half* v;  // [M, 2048] each
     const float* cos; const float* sin;  // [M, 48]
     float eps;
 };
 
-// x += (dequant) * gate, the block's gated residual; x is the fp32 residual stream [M, N]
+// x += dequant * gate on the fp32 residual stream
 struct ResidualEpilogue {
     float* x;
     const float* gate;  // [N]
 };
 
-// rows of W were interleaved so that output 2j is the value half and 2j+1 the gate half of channel j
+// w rows are interleaved: output 2j is the value and 2j + 1 the gate of channel j
 struct SwigluEpilogue {
     __half* h;  // [M, N / 2]
 };
@@ -232,16 +216,15 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
     acc.clear();
     mma((op.k + kTileK - 1) / kTileK, acc, it_a, it_b, acc);
 
-    // accumulator (m, n) of the warp is acc[(m + n * kWarpRows) * 4 + i]; i = 0, 1 are row g, columns 2t and
-    // 2t + 1 of the 16x8 tile, i = 2, 3 the same columns of row g + 8
+    // mma tile (m, n) is acc[(m + n * 4) * 4 + i]: i = 0, 1 are row g, cols 2t and 2t + 1; i = 2, 3 row g + 8
     const int g = lane >> 2, t = lane & 3;
     const int row0 = tile_m * kTileM + (warp % 2) * 64 + g;
     const int col0 = tile_n * kTileN + (warp / 2) * 64 + 2 * t;
 
     if constexpr (std::is_same_v<Epi, QkvEpilogue>) {
-        const int part = col0 / 2048;  // the whole CTA is in one of q, k, v
+        const int part = col0 / 2048;  // the whole cta is in one of q, k, v
         __half* out = part == 0 ? epi.q : part == 1 ? epi.k : epi.v;
-        const int head_col0 = col0 % 2048 - 2 * t;  // first channel of this warp's head
+        const int head_col0 = col0 % 2048 - 2 * t;  // first channel of the warp's head
         float ws[kWarpCols][2], wb[kWarpCols][2];
 #pragma unroll
         for (int n = 0; n < kWarpCols; ++n)
@@ -275,7 +258,7 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
                     for (int n = 0; n < kWarpCols; ++n)
 #pragma unroll
                         for (int e = 0; e < 2; ++e) nv[n][e] = __fmul_rn(val[n][e], rn);
-                    // channels n * 8 + 2t + e: tiles n < 3 are the first rotary half, 3 <= n < 6 the second
+                    // tiles n < 3 are the first rotary half, 3 <= n < 6 the second
 #pragma unroll
                     for (int n = 0; n < kWarpCols; ++n) {
                         if (n < 6 && live) {
@@ -304,7 +287,7 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
                 }
             }
     } else {
-        // this thread's 16 columns: their scales, biases and gates, loaded once
+        // scales, biases and gates of this thread's 16 columns
         float ws[kWarpCols][2], wb[kWarpCols][2], gt[kWarpCols][2];
 #pragma unroll
         for (int n = 0; n < kWarpCols; ++n)
@@ -325,7 +308,7 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
 #pragma unroll
                 for (int n = 0; n < kWarpCols; ++n) {
                     const int c = col0 + n * 8;
-                    // index acc directly: taking an element's address would move the accumulators to local memory
+                    // index acc directly, an element's address moves acc to local memory
                     const int i = (m + n * kWarpRows) * 4 + half * 2;
                     const float v0 = dq(acc[i], xs, ws[n][0], wb[n][0]);
                     const float v1 = dq(acc[i + 1], xs, ws[n][1], wb[n][1]);
@@ -336,7 +319,7 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
                         x.y = __fadd_rn(x.y, __fmul_rn(v1, gt[n][1]));
                         *p = x;
                     } else {
-                        // hidden * silu(gate), silu as torch computes it: g / (1 + exp(-g))
+                        // silu as torch computes it, g / (1 + exp(-g))
                         const float silu = __fdiv_rn(v1, __fadd_rn(1.f, expf(-v1)));
                         epi.h[static_cast<size_t>(r) * (op.n / 2) + c / 2] = __float2half_rn(__fmul_rn(v0, silu));
                     }
@@ -345,18 +328,15 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
     }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
 // host side
-// ---------------------------------------------------------------------------------------------------------------
 
-// 6 stages (96 KiB) is the stage count of cuBLAS's kernel for these shapes and leaves one CTA per SM; 3 stages
-// (48 KiB) fit two CTAs per SM, so one CTA's epilogue can run beside the other's mainloop
-using DecoderGemm = Gemm<6>;
-int g_stages = 3;  // 14.2 ms per decoder block against 16.2 ms with 6 (baseline/vae_block_check.py)
+// 3 stages (48 KiB) fit two ctas per sm, so one cta's epilogue runs beside the other's mainloop
+using DecoderGemm = Gemm<3>;
 
-template <int kStages, typename Epi>
-void launch_gemm_stages(const Operands& op, const Epi& epi) {
-    using G = Gemm<kStages>;
+template <typename Epi>
+void launch_gemm(const Operands& op, const Epi& epi) {
+    TORCH_CHECK(op.n % kTileN == 0 && op.k % kTileK == 0, "N must be a multiple of 128 and K of 64");
+    using G = DecoderGemm;
     using Mma = typename G::Mma;
     auto kernel = int8_gemm_kernel<Mma, Epi>;
     static bool opted = [&] {
@@ -368,18 +348,6 @@ void launch_gemm_stages(const Operands& op, const Epi& epi) {
     dim3 grid(op.n / kTileN, (op.m + kTileM - 1) / kTileM);
     kernel<<<grid, kGemmThreads, G::kSmem, at::cuda::getCurrentCUDAStream()>>>(op, pa, pb, epi);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-}
-
-template <typename Epi>
-void launch_gemm(const Operands& op, const Epi& epi) {
-    TORCH_CHECK(op.n % kTileN == 0 && op.k % kTileK == 0, "N must be a multiple of 128 and K of 64");
-    if (g_stages == 3) launch_gemm_stages<3>(op, epi);
-    else launch_gemm_stages<6>(op, epi);
-}
-
-void set_gemm_stages(int64_t stages) {
-    TORCH_CHECK(stages == 3 || stages == 6, "3 or 6 stages");
-    g_stages = static_cast<int>(stages);
 }
 
 Operands operands(const torch::Tensor& a, const torch::Tensor& a_scale, const torch::Tensor& w,
@@ -459,6 +427,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("gemm_qkv", &h3mk::gemm_qkv, "int8 qkv projection, dequant, qk norm and rope");
     m.def("gemm_residual", &h3mk::gemm_residual, "int8 projection, dequant and gated residual, in place");
     m.def("gemm_swiglu", &h3mk::gemm_swiglu, "int8 fc1, dequant and swiglu on interleaved rows");
-    m.def("set_gemm_stages", &h3mk::set_gemm_stages, "pipeline stages of the int8 GEMM mainloop: 3 or 6");
     m.attr("gemm_smem") = h3mk::DecoderGemm::kSmem;
 }

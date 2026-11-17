@@ -1,9 +1,5 @@
-"""Group the video decoder's kernel time by kind, per arm, from an nsys export (request.sqlite).
-
-  python baseline/vae_kernels.py <request.sqlite> [--json out.json]
-Each arm runs inside an "arm.<name>" NVTX range (fastvideo_capacity.py --arms) and its decoder inside
-"minimax_h3.vae"; without arm ranges the whole report is one arm.
-"""
+# groups the video decoder's kernel time by kind for each arm.<name> nvtx range of an nsys export
+# usage: python baseline/vae_kernels.py <request.sqlite> [--json out.json]
 import argparse
 import json
 import re

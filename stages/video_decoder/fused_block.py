@@ -1,18 +1,4 @@
-"""The H3 video decoder block on fused kernels (kernels.cu).
-
-FastVideo's block, with every linear an INT8 ConvRot linear (rotate, quantize, int8 GEMM, dequant):
-  x = x + to_out(attention(rope(norm_q(q)), rope(norm_k(k)), v)) * scale1,  q, k, v = to_q/k/v(norm1(x))
-  x = x + w2(swiglu(w1(norm2(x)))) * scale2
-Here it is eight kernels:
-  rowquant(x, norm1)                     norm, rotation and int8 quantization of each row, once for q, k and v
-  gemm_qkv                               one GEMM for q, k and v; dequant, qk norm and rope in the epilogue
-  attention                              FastVideo's own (PyTorch's flash attention through SDPA)
-  rowquant(o)                            rotation and quantization of the attention output
-  gemm_residual(to_out, scale1)          dequant and gated residual in the epilogue
-  rowquant(x, norm2)
-  gemm_swiglu(w1)                        dequant and swiglu in the epilogue, on interleaved w1 rows
-  rowquant(h), gemm_residual(w2, scale2)
-"""
+# the h3 video decoder block as eight kernels (kernels.cu) and fastvideo's attention
 import functools
 import hashlib
 import os
@@ -54,8 +40,8 @@ def _build_dir():
     return str(path)
 
 
+# one block's weights in the layout the kernels read
 class Packed:
-    """One block's weights in the layout the fused kernels read, built once from FastVideo's modules."""
 
     def __init__(self, block):
         attn, ff = block.attn, block.ff
@@ -69,8 +55,7 @@ class Packed:
         self.s_qkv = torch.cat([q[1], k[1], v[1]]).contiguous()
         self.b_qkv = torch.cat([q[2], k[2], v[2]]).contiguous()
         self.w_out, self.s_out, self.b_out = (t.contiguous() for t in lin(attn.to_out[0]))
-        # swiglu: chunk(2) makes rows [0, F) the value and [F, 2F) the gate; interleave them so that output 2j
-        # and 2j + 1 are the value and gate of channel j and one thread holds both
+        # interleave the value rows [0, F) and gate rows [F, 2F), so one thread holds both halves of a channel
         w1, s1, b1 = lin(ff.net[0].proj)
         f = w1.shape[0] // 2
         order = torch.stack([torch.arange(f), torch.arange(f) + f], dim=1).reshape(-1).to(w1.device)
@@ -84,11 +69,9 @@ class Packed:
             assert l.convrot and l.group_size == 256, "the rotation kernel is the 256 group ConvRot"
 
 
+# x is [B, S, 2048]; inplace updates a contiguous fp32 x
 @torch.no_grad()
 def forward(block, packed, x, rotary_emb, inplace=False):
-    """The block on the fused kernels; x is [B, S, 2048], the result the fp32 residual stream.
-
-    With inplace, a contiguous fp32 x is updated in place, as the decoder loop owns its residual stream."""
     e = ext()
     shape = x.shape
     m = shape[0] * shape[1]
@@ -112,9 +95,7 @@ def forward(block, packed, x, rotary_emb, inplace=False):
     return xf.view(shape[0], shape[1], HIDDEN)
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# fp32 reference: the same block with dequantized weights, exact rotation and no activation rounding
-# ---------------------------------------------------------------------------------------------------------------
+# fp32 reference: dequantized weights, exact rotation, no activation rounding
 
 def _hadamard(device):
     from fastvideo.models.vaes.minimax_h3_int8_convrot import regular_hadamard
@@ -129,9 +110,9 @@ def _linear_fp32(layer, x, hadamard):
     return (rotated @ w.T + layer.bias.float()).reshape(*x.shape[:-1], w.shape[0])
 
 
+# a few tiles at a time to bound the attention memory
 @torch.no_grad()
 def reference_fp32(block, x, rotary_emb, tiles_per_chunk=4):
-    """FastVideo's block in fp32, one chunk of tiles at a time to bound the attention memory."""
     prev = torch.backends.cuda.matmul.allow_tf32
     torch.backends.cuda.matmul.allow_tf32 = False
     try:
@@ -144,23 +125,22 @@ def reference_fp32(block, x, rotary_emb, tiles_per_chunk=4):
 def _reference_fp32(block, x, rotary_emb, tiles_per_chunk):
     from fastvideo.models.vaes.minimax_h3_video import _apply_rotary
 
-    if True:
-        hadamard = _hadamard(x.device)
-        attn, ff = block.attn, block.ff
-        outs = []
-        for start in range(0, x.shape[0], tiles_per_chunk):
-            h = x[start:start + tiles_per_chunk].float()
-            cos, sin = (t[start:start + tiles_per_chunk].float() for t in rotary_emb)
-            n = F.rms_norm(h, (HIDDEN,), block.norm1.weight.float(), block.norm1.eps)
-            q, k, v = (_linear_fp32(l, n, hadamard).unflatten(2, (HEADS, -1)) for l in (attn.to_q, attn.to_k, attn.to_v))
-            q = F.rms_norm(q, (HEAD_DIM,), eps=attn.norm_q.eps)
-            k = F.rms_norm(k, (HEAD_DIM,), eps=attn.norm_k.eps)
-            q, k = _apply_rotary(q, k, cos, sin)
-            o = F.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2),
-                                               scale=HEAD_DIM**-0.5).transpose(1, 2).flatten(2, 3)
-            h = h + _linear_fp32(attn.to_out[0], o, hadamard) * block.scale1.float()
-            n = F.rms_norm(h, (HIDDEN,), block.norm2.weight.float(), block.norm2.eps)
-            u, g = _linear_fp32(ff.net[0].proj, n, hadamard).chunk(2, dim=-1)
-            h = h + _linear_fp32(ff.net[2], u * F.silu(g), hadamard) * block.scale2.float()
-            outs.append(h)
-        return torch.cat(outs)
+    hadamard = _hadamard(x.device)
+    attn, ff = block.attn, block.ff
+    outs = []
+    for start in range(0, x.shape[0], tiles_per_chunk):
+        h = x[start:start + tiles_per_chunk].float()
+        cos, sin = (t[start:start + tiles_per_chunk].float() for t in rotary_emb)
+        n = F.rms_norm(h, (HIDDEN,), block.norm1.weight.float(), block.norm1.eps)
+        q, k, v = (_linear_fp32(l, n, hadamard).unflatten(2, (HEADS, -1)) for l in (attn.to_q, attn.to_k, attn.to_v))
+        q = F.rms_norm(q, (HEAD_DIM,), eps=attn.norm_q.eps)
+        k = F.rms_norm(k, (HEAD_DIM,), eps=attn.norm_k.eps)
+        q, k = _apply_rotary(q, k, cos, sin)
+        o = F.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2),
+                                           scale=HEAD_DIM**-0.5).transpose(1, 2).flatten(2, 3)
+        h = h + _linear_fp32(attn.to_out[0], o, hadamard) * block.scale1.float()
+        n = F.rms_norm(h, (HIDDEN,), block.norm2.weight.float(), block.norm2.eps)
+        u, g = _linear_fp32(ff.net[0].proj, n, hadamard).chunk(2, dim=-1)
+        h = h + _linear_fp32(ff.net[2], u * F.silu(g), hadamard) * block.scale2.float()
+        outs.append(h)
+    return torch.cat(outs)
