@@ -275,12 +275,116 @@ def verify_hazy_vsa_dynamic(capture_run_id: str, compress: bool):
                    cwd=root, env=env, check=True, timeout=1800)
 
 
+def _nsight(name: str) -> str:
+    import glob
+    import shutil
+
+    return shutil.which(name) or sorted(glob.glob(f"/opt/nvidia/nsight-*/*/{name}") +
+                                        glob.glob(f"/opt/nvidia/nsight-*/*/bin/{name}"))[-1]
+
+
+def _run_dit(script: str, argv: list[str], timeout: int, profiler: str = "", ncu_args: str = "",
+             timings: bool = False):
+    """Build the full-DiT Hazy module and run one of its gates beside FastVideo.
+
+    `profiler` wraps the gate in Nsight Systems ("nsys") or Nsight Compute
+    ("ncu"). Both record only between cudaProfilerStart and Stop, which the
+    gate places with --profile-range. Reports go to `<--out>-profile/`.
+    """
+    import shlex
+
+    if "/" in script or not script.endswith(".py"):
+        raise ValueError("script must name a file in megakernel/tests")
+    if profiler not in ("", "nsys", "ncu"):
+        raise ValueError("profiler must be nsys or ncu")
+    root = Path("/root/megakernel")
+    subprocess.run(["uv", "pip", "install", "--system", "pybind11"], check=True)
+    build = subprocess.run(["make", "GPU=RTXPRO6000", "CUTLASS_ROOT=/opt/cutlass",
+                            "THUNDERKITTENS_ROOT=/opt/tk", f"TIMINGS={int(timings)}", "hazy_dit"],
+                           cwd=root, text=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT)
+    print("\n".join(build.stdout.splitlines()[-150:]), flush=True)
+    if build.returncode:
+        raise RuntimeError(f"Hazy DiT compile exited {build.returncode}")
+    env = {**os.environ,
+           "PYTHONPATH": f"{root / 'build/RTXPRO6000'}:{root}:{root / 'tests'}:/root/baseline:"
+                         f"{os.environ.get('PYTHONPATH', '')}",
+           "PYTHONUNBUFFERED": "1", "FASTVIDEO_H3_VSA_FP4": "0"}
+    command = [sys.executable, str(root / "tests" / script), *argv]
+    if timings and "--record-timings" not in command:
+        command.append("--record-timings")
+    profile_dir = None
+    if profiler:
+        profile_dir = Path(argv[argv.index("--out") + 1] + "-profile")
+        profile_dir.mkdir(parents=True, exist_ok=False)
+        if profiler == "nsys":
+            # gVisor has no perf_event_open, so no CPU sampling.
+            command = [_nsight("nsys"), "profile", "--trace=cuda,nvtx", "--sample=none",
+                       "--cpuctxsw=none", "--cuda-graph-trace=node",
+                       "--capture-range=cudaProfilerApi", "--capture-range-end=stop",
+                       "--output", str(profile_dir / "request"), *command]
+        else:
+            # Modal cannot lock the GPU clocks.
+            command = [_nsight("ncu"), "--clock-control", "none", "--profile-from-start", "off",
+                       "--export", str(profile_dir / "kernels"), *shlex.split(ncu_args), *command]
+    returncode = -1
+    try:
+        with open((profile_dir or Path("/tmp")) / "driver.log", "w") as log:
+            process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT, text=True)
+            for line in process.stdout:
+                log.write(line)
+                log.flush()
+                print(line, end="", flush=True)
+            returncode = process.wait(timeout=timeout)
+        if profiler == "nsys" and (profile_dir / "request.nsys-rep").exists():
+            subprocess.run([_nsight("nsys"), "stats", "--report",
+                            "nvtx_gpu_proj_sum,cuda_gpu_kern_sum", "--format", "csv", "--output",
+                            str(profile_dir / "request"), str(profile_dir / "request.nsys-rep")])
+        if profiler == "ncu" and (profile_dir / "kernels.ncu-rep").exists():
+            page = subprocess.run([_nsight("ncu"), "--import", str(profile_dir / "kernels.ncu-rep"),
+                                   "--page", "details"], text=True, capture_output=True)
+            (profile_dir / "kernels-details.txt").write_text(page.stdout + page.stderr)
+    finally:
+        if profile_dir is not None:
+            (profile_dir / "returncode").write_text(str(returncode))
+        volume.commit()
+    if returncode:
+        raise RuntimeError(f"{script} exited {returncode}")
+
+
+@app.function(image=image, gpu="RTX-PRO-6000", cpu=8, memory=32768,
+              volumes={"/cache": volume}, timeout=3600)
+def verify_dit_ops(argv: list[str], script: str = "dit_ops.py"):
+    _run_dit(script, argv, 3000)
+
+
+@app.function(image=image, gpu="RTX-PRO-6000", cpu=(8, 32), memory=(131072, 393216),
+              volumes={"/cache": volume}, timeout=10800)
+def verify_dit(script: str, argv: list[str], profiler: str = "", ncu_args: str = "",
+               timings: bool = False):
+    _run_dit(script, argv, 10200, profiler, ncu_args, timings)
+
+
 @app.local_entrypoint()
 def main(mode: str = "inspect", capture_run_id: str = "",
          first_row: int = 0, row_count: int = 64,
          head: int = 0, query_tile: int = 0,
-         compare_fastvideo: bool = False):
-    if mode == "inspect":
+         compare_fastvideo: bool = False, script: str = "hazy_dit.py",
+         args: str = "", profiler: str = "", ncu_args: str = "", spawn: bool = False,
+         timings: bool = False):
+    import shlex
+
+    if mode == "dit-ops":
+        verify_dit_ops.remote(shlex.split(args), script if script != "hazy_dit.py" else "dit_ops.py")
+    elif mode == "dit":
+        if spawn:
+            # With `modal run --detach` the call outlives this client.
+            call = verify_dit.spawn(script, shlex.split(args), profiler, ncu_args, timings)
+            print("spawned", call.object_id)
+        else:
+            verify_dit.remote(script, shlex.split(args), profiler, ncu_args, timings)
+    elif mode == "inspect":
         print(inspect.remote())
     elif mode == "verify":
         verify.remote(capture_run_id)
@@ -318,4 +422,4 @@ def main(mode: str = "inspect", capture_run_id: str = "",
         raise ValueError("mode must be inspect, verify, hazy, qkv, compile, attention-boundary, qknorm, "
                          "projection-attention, projection-sparse, sparse, flashinfer-vsa, vsa-scores, "
                          "hazy-vsa-pool, hazy-vsa-scores, hazy-vsa-topk, hazy-vsa-dynamic, "
-                         "or hazy-vsa-full")
+                         "hazy-vsa-full, dit-ops, or dit")

@@ -5,6 +5,11 @@ namespace h3 {
 // Reference H100/B200 configuration, NOT yet an RTX PRO 6000 SM120 port.
 struct config : megakernel::default_config {
     static constexpr int GMEM_SPIN_LOOP_SLEEP_NANOS = 20;
+#ifdef H3_RECORD_TIMINGS
+    // Per-instruction start/end clocks for every worker role on every SM,
+    // written to globals::timings (build with make TIMINGS=1).
+    static constexpr bool TIMING_RECORD_ENABLED = true;
+#endif
 #ifdef H3_SM120
     // SM120 permits at most 99 KiB/block. Leave margin for the aligned
     // dynamic page base and keep the upstream two-slot instruction protocol.

@@ -8,7 +8,13 @@ enum opcode : int { noop = 0, smoke = 1, rendezvous = 2, graph_task = 3, wave_ba
                     projection_gemm = 5, qknorm_rope_stage = 6,
                     sparse_attention_stage = 7, vsa_pool_stage = 8,
                     vsa_scores_stage = 9, vsa_topk_stage = 10,
-                    vsa_value_pool_stage = 11, vsa_compress_stage = 12 };
+                    vsa_value_pool_stage = 11, vsa_compress_stage = 12,
+                    // Full-DiT instruction set (ops/dit_*.cuh, h3_dit.cu).
+                    dit_projection = 20, dit_rmsnorm_mod = 21, dit_nvfp4_quant = 22,
+                    dit_dense_linear = 23, dit_elementwise = 24, dit_copy_rows = 25,
+                    dit_qknorm_tile = 30, dit_vsa_pool = 31, dit_vsa_scores = 32,
+                    dit_vsa_topk = 33, dit_sparse_attention = 34,
+                    dit_sparse_attention_mma = 35, dit_vsa_compress = 36 };
 // Add H3 tensor layouts, weight views, dependency counters and scalar
 // parameters here as operations are implemented. No Llama dimensions apply.
 struct globals {

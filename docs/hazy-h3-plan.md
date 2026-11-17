@@ -7,7 +7,9 @@ tile gate have passed; see
 `results/hazy-compiler-sm120-20261116.md`, and
 `results/hazy-projection-gate-20261116.md`,
 `results/hazy-qkv-gate-20261116.md`, and
-`results/hazy-qknorm-tile-gate-20261116.md`. Milestone 3 remains in progress.
+`results/hazy-qknorm-tile-gate-20261116.md`. The full DiT now runs in one
+launch (`results/hazy-dit-gate-20261116.md`); milestone 3 remains in progress
+on numerical contract and speed, and milestone 4 has not started.
 
 ## Target and boundary
 
@@ -23,8 +25,9 @@ media encoding/muxing remain host work. The GPU work from token IDs through
 prompt embeddings, generated latents, video frames and audio samples is the
 one-launch goal.
 
-The current `megakernel/` tree is a Hazy runtime scaffold with a smoke opcode,
-not an H3 implementation. `docs/megakernel-plan.md` describes a different
+The `megakernel/` tree holds the Hazy runtime, the gate operations in
+`src/ops/`, and the full-DiT instruction set (`src/h3_dit.cu`,
+`src/ops/dit_*.cuh`, `h3_dit.py`). `docs/megakernel-plan.md` describes a different
 queue-based design and FP4 attention; this plan uses the per-SM instruction
 streams and worker roles in `megakernel/include/`.
 
@@ -135,8 +138,20 @@ tile stage in one Hazy launch; see
 score computation, exact top-k mask construction, V pooling, and the trained
 coarse compression branch subsequently passed for step 0 block 0 in a single
 Hazy launch using captured Q/K/V/gate inputs; see
-`results/hazy-dynamic-vsa-gate-20261116.md`. The remaining DiT linears,
-complete block, and full denoising sequence are open.
+`results/hazy-dynamic-vsa-gate-20261116.md`.
+
+The full DiT has since run as one Hazy launch: text refinement, eight steps
+of 50 blocks, output heads and latent updates (8,144 instructions, 2,800
+NVFP4 GEMMs, 400 tensor-core sparse-attention calls); see
+`results/hazy-dit-gate-20261116.md` and `docs/hazy-h3-dit-handoff.md`. Every
+new operation passed parity, and every NVFP4 linear and the feed-forward are
+bit exact when FastVideo's layer is re-run on the megakernel's intermediate.
+Free-running, the launch produces a coherent clip through FastVideo's
+decoders, but its final video latents have cosine 0.74 against FastVideo and
+it is several times slower. **The milestone pass condition is not met:** the
+divergence has not been shown to be within the reference's own sensitivity,
+and attention throughput under the 168-register limit of the 384-thread CTA
+is open.
 
 - Add SM120 NVFP4 GEMM tasks for Q/K/V, VSA gate, output projection and MLP
   linears. Adapt a CUTLASS-compatible tile scheduler to Hazy instructions;
