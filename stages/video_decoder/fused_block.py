@@ -14,6 +14,7 @@ Here it is eight kernels:
   rowquant(h), gemm_residual(w2, scale2)
 """
 import functools
+import hashlib
 import os
 from pathlib import Path
 
@@ -46,7 +47,9 @@ def ext():
 
 
 def _build_dir():
-    path = Path(os.environ.get("H3MK_EXT_DIR", "/tmp/h3mk-ext")) / "video_decoder"
+    # one folder per source version: ninja does not see a mounted kernels.cu as newer than the cached build
+    digest = hashlib.sha1((HERE / "kernels.cu").read_bytes()).hexdigest()[:12]
+    path = Path(os.environ.get("H3MK_EXT_DIR", "/tmp/h3mk-ext")) / f"video_decoder-{digest}"
     path.mkdir(parents=True, exist_ok=True)
     return str(path)
 
