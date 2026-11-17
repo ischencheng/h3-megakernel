@@ -34,7 +34,9 @@ image = (
     .run_commands("uv pip uninstall pynvml || true", "uv pip install --reinstall nvidia-ml-py")
     .apt_install("cuda-nsight-systems-13-0", "cuda-nsight-compute-13-0")
     .run_commands("uv pip install ninja")  # flashinfer's jit builds the one-launch mlp (stages/dit/fi_mlp.py)
-    .env({"HF_HOME": "/cache/hf", "HF_XET_HIGH_PERFORMANCE": "1", "H3MK_DATA": "/tmp/h3mk-data"})
+    # H3MK_EXT_DIR keeps the decoder kernels' build (stages/video_decoder) across runs
+    .env({"HF_HOME": "/cache/hf", "HF_XET_HIGH_PERFORMANCE": "1", "H3MK_DATA": "/tmp/h3mk-data",
+          "H3MK_EXT_DIR": "/cache/h3mk-ext"})
     .add_local_dir(HERE, "/root/baseline", ignore=["**/__pycache__/**"])
     .add_local_dir(HERE.parent / "harness", "/root/h3mk/harness", ignore=["**/__pycache__/**"])
     .add_local_dir(HERE.parent / "stages", "/root/h3mk/stages", ignore=["**/__pycache__/**"])

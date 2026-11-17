@@ -72,8 +72,10 @@ def main():
                         help="only this rep runs inside cudaProfilerStart/Stop, for nsys or ncu; "
                              "with --arms, every arm after the warmup does")
     parser.add_argument("--arms", nargs="+", default=None,
-                        help="after one warmup, one request per arm of mlp_swap.py: fastvideo, flashinfer_mlp, "
-                             "mlp_one_launch")
+                        help="after one warmup, one request per arm of the --swap script: fastvideo, flashinfer_mlp, "
+                             "mlp_one_launch (mlp_swap.py) or fastvideo, fused (vae_swap.py)")
+    parser.add_argument("--swap", choices=("mlp", "vae"), default="mlp",
+                        help="mlp: the DiT MLP half (mlp_swap.py), vae: the video decoder blocks (vae_swap.py)")
     parser.add_argument("--check-calls", type=int, default=3, help="MLP calls checked against fp32 per arm")
     args = parser.parse_args()
 
@@ -117,7 +119,11 @@ def main():
     path.write_text(json.dumps(summary, indent=1))
 
     swap = None
-    if args.arms:
+    if args.arms and args.swap == "vae":
+        import vae_swap
+
+        swap = vae_swap.VaeSwap()
+    elif args.arms:
         import mlp_swap
 
         swap = mlp_swap.MlpSwap(args.check_calls)
