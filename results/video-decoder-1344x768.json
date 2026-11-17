@@ -1,0 +1,324 @@
+{
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition, 97887 MiB, 610.57.04",
+ "model": "FastVideo/FastVideo-FastH3-8-Step-V2-NVFP4-Consumer",
+ "revision": "9d0d0d3ae69365aded83fab5562f00f9f06c12aa",
+ "env": {
+  "FASTVIDEO_H3_VSA_FP4": "1",
+  "FASTVIDEO_MINIMAX_H3_FUSIONS": "all",
+  "FASTVIDEO_NVFP4_MM_BACKEND": "cutlass",
+  "FASTVIDEO_H3_VAE_TILE_BATCH": "28",
+  "FASTVIDEO_STAGE_LOGGING": "1"
+ },
+ "runs": [
+  {
+   "shape": "1344x768",
+   "rep": 0,
+   "client_s": 247.36981415748596,
+   "peak_mib": 68386,
+   "generation_s": 246.91684879200002,
+   "reported_peak_mb": 58028.1201171875,
+   "video_path": "/cache/runs/vae-fused-1344x768-r2/1344x768-warmup.mp4",
+   "stages": {
+    "input_preparation_stage": 6.10700000009956e-05,
+    "conditioning_stage": 124.04815794200002,
+    "latent_preparation_stage": 0.012927649999994628,
+    "denoising_stage": 28.56905561800002,
+    "video_decoding_stage": 94.08830999299997,
+    "audio_decoding_stage": 0.1444351090000282,
+    "PostDecodeFrameProcessStage": 0.026980252000043947,
+    "VideoSaveStage": 0.42144933399998763,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ],
+   "arm": "fastvideo",
+   "decode_clip_calls": 7,
+   "decode_clip_ms_total": 93673.56896972656,
+   "check_s": 0.0,
+   "checks": [],
+   "client_s_without_checks": 247.36981415748596
+  },
+  {
+   "shape": "1344x768",
+   "rep": 1,
+   "client_s": 30.07230854034424,
+   "peak_mib": 75576,
+   "generation_s": 29.63513324600001,
+   "reported_peak_mb": 58029.62841796875,
+   "video_path": "/cache/runs/vae-fused-1344x768-r2/1344x768-fused.mp4",
+   "stages": {
+    "input_preparation_stage": 6.445500002882909e-05,
+    "conditioning_stage": 0.10493434099998922,
+    "latent_preparation_stage": 0.012235775000021931,
+    "denoising_stage": 25.741843357999983,
+    "video_decoding_stage": 3.683305206,
+    "audio_decoding_stage": 0.06052004099996111,
+    "PostDecodeFrameProcessStage": 0.02697758800002248,
+    "VideoSaveStage": 0.4047360240000444,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ],
+   "arm": "fused",
+   "decode_clip_calls": 7,
+   "decode_clip_ms_total": 3657.7538146972656,
+   "check_s": 1.1052894592285156,
+   "checks": [
+    {
+     "block": 0,
+     "rows": 50316,
+     "input_dtype": "torch.float32",
+     "branch_vs_fp32": {
+      "rel_l2": 0.0016506122128936331,
+      "max_over_rms": 0.10045818810221259
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.0016593846789511172,
+      "max_over_rms": 0.10614348289708653
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.0002966040615322556,
+      "max_over_rms": 0.047816823538930395
+     },
+     "out_vs_fp32": {
+      "rel_l2": 0.001131916765630498,
+      "max_over_rms": 0.0688897758731121
+     },
+     "fastvideo_out_vs_fp32": {
+      "rel_l2": 0.001137932534403336,
+      "max_over_rms": 0.072788499228474
+     },
+     "passes": true
+    },
+    {
+     "block": 1,
+     "rows": 50316,
+     "input_dtype": "torch.float32",
+     "branch_vs_fp32": {
+      "rel_l2": 0.0032461845429821896,
+      "max_over_rms": 0.15201023415075005
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.003251429033338106,
+      "max_over_rms": 0.14295224699435466
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.0007716932964214495,
+      "max_over_rms": 0.0711305725896531
+     },
+     "out_vs_fp32": {
+      "rel_l2": 0.0014739050725803273,
+      "max_over_rms": 0.06901907250058535
+     },
+     "fastvideo_out_vs_fp32": {
+      "rel_l2": 0.0014762862930058247,
+      "max_over_rms": 0.06490636340735001
+     },
+     "passes": true
+    },
+    {
+     "block": 13,
+     "rows": 50316,
+     "input_dtype": "torch.float32",
+     "branch_vs_fp32": {
+      "rel_l2": 0.0117230995228735,
+      "max_over_rms": 0.1484675861398121
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.01172571973401705,
+      "max_over_rms": 0.15819833856866625
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.007144054823812173,
+      "max_over_rms": 0.09534049613862228
+     },
+     "out_vs_fp32": {
+      "rel_l2": 0.0053544351432497795,
+      "max_over_rms": 0.06781141965200317
+     },
+     "fastvideo_out_vs_fp32": {
+      "rel_l2": 0.00535563190444782,
+      "max_over_rms": 0.07225586543063524
+     },
+     "passes": true
+    },
+    {
+     "block": 25,
+     "rows": 50316,
+     "input_dtype": "torch.float32",
+     "branch_vs_fp32": {
+      "rel_l2": 0.0023364234837251327,
+      "max_over_rms": 0.1930468095826356
+     },
+     "fastvideo_branch_vs_fp32": {
+      "rel_l2": 0.0023346074371284917,
+      "max_over_rms": 0.18767462424891754
+     },
+     "branch_vs_fastvideo": {
+      "rel_l2": 0.00032635941690155703,
+      "max_over_rms": 0.07280415700615131
+     },
+     "out_vs_fp32": {
+      "rel_l2": 0.000826844915661527,
+      "max_over_rms": 0.06831800285913756
+     },
+     "fastvideo_out_vs_fp32": {
+      "rel_l2": 0.0008262022287062312,
+      "max_over_rms": 0.06641682161826518
+     },
+     "passes": true
+    }
+   ],
+   "client_s_without_checks": 28.967019081115723,
+   "psnr_vs_fastvideo": "40.436336"
+  },
+  {
+   "shape": "1344x768",
+   "rep": 2,
+   "client_s": 30.86326026916504,
+   "peak_mib": 75576,
+   "generation_s": 30.42609784000001,
+   "reported_peak_mb": 58028.17919921875,
+   "video_path": "/cache/runs/vae-fused-1344x768-r2/1344x768-fastvideo.mp4",
+   "stages": {
+    "input_preparation_stage": 4.754000002549219e-05,
+    "conditioning_stage": 0.0846439270000019,
+    "latent_preparation_stage": 0.011665832000005594,
+    "denoising_stage": 25.800812399999984,
+    "video_decoding_stage": 4.449844655999982,
+    "audio_decoding_stage": 0.049443855999982134,
+    "PostDecodeFrameProcessStage": 0.026761410999995405,
+    "VideoSaveStage": 0.40625518199999533,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ],
+   "arm": "fastvideo",
+   "decode_clip_calls": 7,
+   "decode_clip_ms_total": 4424.510070800781,
+   "check_s": 0.0,
+   "checks": [],
+   "client_s_without_checks": 30.86326026916504
+  },
+  {
+   "shape": "1344x768",
+   "rep": 3,
+   "client_s": 29.027854919433594,
+   "peak_mib": 75576,
+   "generation_s": 28.589288597000007,
+   "reported_peak_mb": 58027.1552734375,
+   "video_path": "/cache/runs/vae-fused-1344x768-r2/1344x768-fused_1.mp4",
+   "stages": {
+    "input_preparation_stage": 6.826099996715129e-05,
+    "conditioning_stage": 0.08418275100001438,
+    "latent_preparation_stage": 0.011119274999998652,
+    "denoising_stage": 25.804193851000036,
+    "video_decoding_stage": 2.6094773739999937,
+    "audio_decoding_stage": 0.048124232000020584,
+    "PostDecodeFrameProcessStage": 0.027830512999969415,
+    "VideoSaveStage": 0.4062176019999697,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ],
+   "arm": "fused",
+   "decode_clip_calls": 7,
+   "decode_clip_ms_total": 2584.098907470703,
+   "check_s": 0.0,
+   "checks": [],
+   "client_s_without_checks": 29.027854919433594,
+   "psnr_vs_fastvideo": "40.438614"
+  },
+  {
+   "shape": "1344x768",
+   "rep": 4,
+   "client_s": 30.89174747467041,
+   "peak_mib": 75576,
+   "generation_s": 30.42714661599996,
+   "reported_peak_mb": 58029.31298828125,
+   "video_path": "/cache/runs/vae-fused-1344x768-r2/1344x768-fastvideo_1.mp4",
+   "stages": {
+    "input_preparation_stage": 5.984799997804657e-05,
+    "conditioning_stage": 0.0836334780000243,
+    "latent_preparation_stage": 0.01065899600001785,
+    "denoising_stage": 25.79450900400002,
+    "video_decoding_stage": 4.450401714000009,
+    "audio_decoding_stage": 0.05443481999998312,
+    "PostDecodeFrameProcessStage": 0.02712452299999768,
+    "VideoSaveStage": 0.43244285500003343,
+    "AudioMuxStage": 0.0
+   },
+   "streams": [
+    {
+     "codec_name": "h264",
+     "width": 1344,
+     "height": 768,
+     "nb_frames": "124"
+    },
+    {
+     "codec_name": "aac",
+     "sample_rate": "32000",
+     "channels": 2,
+     "nb_frames": "163"
+    }
+   ],
+   "arm": "fastvideo",
+   "decode_clip_calls": 7,
+   "decode_clip_ms_total": 4425.12939453125,
+   "check_s": 0.0,
+   "checks": [],
+   "client_s_without_checks": 30.89174747467041
+  }
+ ],
+ "startup_s": 53.185317039489746,
+ "loaded_peak_mib": 56924,
+ "resident_mib": 58276
+}

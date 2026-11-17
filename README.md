@@ -74,6 +74,8 @@ From the table, the DiT is 84% of a 1344x768 request and the video decoder is 14
 
 In Milestone 1 we replaced the MLP half of every DiT block. The request went from 30.84 s to 29.10 s. FlashInfer's fused kernels account for 1.71 s of that, and running them as one launch adds 0.03 s. Details are in [Milestone 1](docs/milestones/m1.md).
 
+In Milestone 2 we ran the video decoder's blocks as eight fused kernels each. The decoder went from 4.45 s to 2.61 s at 1344x768 and from 1.89 s to 1.12 s at 832x480, and the 1344x768 request from 30.9 s to 29.0 s. Details are in [Milestone 2](docs/milestones/m2.md#video-decoder).
+
 ### Credits
 
 * [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) and [FastH3](https://huggingface.co/collections/FastVideo/fastvideo-fasth3) for the model weights

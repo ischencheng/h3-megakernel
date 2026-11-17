@@ -352,7 +352,7 @@ __global__ void __launch_bounds__(kGemmThreads) int8_gemm_kernel(Operands op, ty
 // 6 stages (96 KiB) is the stage count of cuBLAS's kernel for these shapes and leaves one CTA per SM; 3 stages
 // (48 KiB) fit two CTAs per SM, so one CTA's epilogue can run beside the other's mainloop
 using DecoderGemm = Gemm<6>;
-int g_stages = 6;
+int g_stages = 3;  // 14.2 ms per decoder block against 16.2 ms with 6 (baseline/vae_block_check.py)
 
 template <int kStages, typename Epi>
 void launch_gemm_stages(const Operands& op, const Epi& epi) {

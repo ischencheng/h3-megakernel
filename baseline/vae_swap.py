@@ -56,7 +56,8 @@ def decoder_forward(dec, packed, hidden_states, checker=None):
 class VaeSwap:
 
     def __init__(self, check_blocks=(0, 1, 13, 25)):
-        self.check_blocks = tuple(check_blocks)
+        # H3MK_VAE_CHECK=0 skips the checks, for runs that measure memory
+        self.check_blocks = tuple(check_blocks) if os.environ.get("H3MK_VAE_CHECK", "1") != "0" else ()
         self.packed = None
         self.checked = False  # the blocks are checked on the first fused request only, which is not timed
         self.set_arm("fastvideo")
@@ -78,7 +79,7 @@ class VaeSwap:
             out = _DECODE_CLIP(module, z)
         else:
             # the first clip is a single latent frame, so check the blocks on the second, a full one
-            checker = self if self.calls == 1 and not self.checked else None
+            checker = self if self.calls == 1 and not self.checked and self.check_blocks else None
             compiled = dec.__dict__.get("forward")
             dec.forward = lambda x: decoder_forward(dec, self.packed, x, checker)
             try:

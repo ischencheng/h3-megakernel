@@ -77,7 +77,12 @@ def main():
     parser.add_argument("--swap", choices=("mlp", "vae"), default="mlp",
                         help="mlp: the DiT MLP half (mlp_swap.py), vae: the video decoder blocks (vae_swap.py)")
     parser.add_argument("--check-calls", type=int, default=3, help="MLP calls checked against fp32 per arm")
+    parser.add_argument("--empty-cache", action="store_true",
+                        help="release PyTorch's cached memory before each request, so each peak is that request's own")
+    parser.add_argument("--no-checks", action="store_true", help="skip vae_swap.py's checks against fp32")
     args = parser.parse_args()
+    if args.no_checks:
+        os.environ["H3MK_VAE_CHECK"] = "0"
 
     OUT.mkdir(parents=True, exist_ok=True)
     os.environ.update(ENV)
@@ -140,6 +145,10 @@ def main():
                 swap.set_arm(arm)
             else:
                 profile = rep == args.profile_rep
+            if args.empty_cache:
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+                time.sleep(1)  # one more nvidia-smi sample after the release
             peak.take()
             if profile and (not args.arms or rep == 1):
                 torch.cuda.synchronize()

@@ -1,0 +1,78 @@
+{
+ "fused": {
+  "vae_span_ms": 2621.330987,
+  "kernel_ms": 2608.2844,
+  "kernels": 2501,
+  "idle_ms": 13.046586999999818,
+  "by_kind": {
+   "other": {
+    "kernels": 842,
+    "ms": 38.4827869999999
+   },
+   "proj_in / proj_out GEMM": {
+    "kernels": 21,
+    "ms": 13.087182
+   },
+   "rotation + quantize (ours)": {
+    "kernels": 728,
+    "ms": 362.61836999999986
+   },
+   "int8 GEMM (ours, fused epilogue)": {
+    "kernels": 728,
+    "ms": 1742.5345110000012
+   },
+   "attention": {
+    "kernels": 182,
+    "ms": 451.5615499999999
+   }
+  }
+ },
+ "fastvideo": {
+  "vae_span_ms": 4449.239805,
+  "kernel_ms": 4432.885884,
+  "kernels": 7250,
+  "idle_ms": 16.3539209999999,
+  "by_kind": {
+   "other": {
+    "kernels": 1951,
+    "ms": 49.99646300000005
+   },
+   "proj_in / proj_out GEMM": {
+    "kernels": 21,
+    "ms": 12.110757
+   },
+   "norm / residual / dequant": {
+    "kernels": 1092,
+    "ms": 695.1109479999991
+   },
+   "rotation GEMM (fp16)": {
+    "kernels": 1274,
+    "ms": 448.20260300000007
+   },
+   "row quantize": {
+    "kernels": 1092,
+    "ms": 339.28925799999973
+   },
+   "int8 GEMM": {
+    "kernels": 1092,
+    "ms": 1739.742585999999
+   },
+   "qk norm + rope": {
+    "kernels": 182,
+    "ms": 155.19506500000006
+   },
+   "attention input dequant + cast": {
+    "kernels": 182,
+    "ms": 75.91365499999996
+   },
+   "attention": {
+    "kernels": 182,
+    "ms": 414.21558800000014
+   },
+   "dequant + swiglu": {
+    "kernels": 182,
+    "ms": 503.10896099999997
+   }
+  }
+ }
+}

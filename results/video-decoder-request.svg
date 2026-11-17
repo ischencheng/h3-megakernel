@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="340" viewBox="0 0 1040 340" font-family="sans-serif" font-size="12">
+<rect width="1040" height="340" fill="white"/>
+<rect x="780" y="14" width="12" height="12" fill="#7f8c8d"/><text x="796" y="24">FastVideo</text>
+<rect x="910" y="14" width="12" height="12" fill="#2e86c1"/><text x="926" y="24">fused blocks</text>
+<text x="60" y="58" font-size="14">Video decoder stage (s)</text>
+<line x1="60" y1="290" x2="480" y2="290" stroke="#333"/>
+<rect x="91.5" y="98.7" width="66.2" height="191.3" fill="#7f8c8d"/>
+<text x="124.6" y="94.7" text-anchor="middle">4.45 s</text>
+<rect x="165.0" y="177.8" width="66.2" height="112.2" fill="#2e86c1"/>
+<text x="198.1" y="173.8" text-anchor="middle">2.61 s</text>
+<text x="165.0" y="308" text-anchor="middle">1344x768</text>
+<rect x="301.5" y="208.9" width="66.2" height="81.1" fill="#7f8c8d"/>
+<text x="334.6" y="204.9" text-anchor="middle">1.89 s</text>
+<rect x="375.0" y="241.8" width="66.2" height="48.2" fill="#2e86c1"/>
+<text x="408.1" y="237.8" text-anchor="middle">1.12 s</text>
+<text x="375.0" y="308" text-anchor="middle">832x480</text>
+<text x="560" y="58" font-size="14">Whole request (s)</text>
+<line x1="560" y1="290" x2="980" y2="290" stroke="#333"/>
+<rect x="591.5" y="98.7" width="66.2" height="191.3" fill="#7f8c8d"/>
+<text x="624.6" y="94.7" text-anchor="middle">30.89 s</text>
+<rect x="665.0" y="110.2" width="66.2" height="179.8" fill="#2e86c1"/>
+<text x="698.1" y="106.2" text-anchor="middle">29.03 s</text>
+<text x="665.0" y="308" text-anchor="middle">1344x768</text>
+<rect x="801.5" y="221.3" width="66.2" height="68.7" fill="#7f8c8d"/>
+<text x="834.6" y="217.3" text-anchor="middle">11.10 s</text>
+<rect x="875.0" y="226.3" width="66.2" height="63.7" fill="#2e86c1"/>
+<text x="908.1" y="222.3" text-anchor="middle">10.29 s</text>
+<text x="875.0" y="308" text-anchor="middle">832x480</text>
+</svg>
