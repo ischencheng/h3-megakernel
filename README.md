@@ -17,8 +17,8 @@ MiniMax-H3 turns a text prompt into video with sound. It has a text encoder, a D
 
 | Milestone | Date | Goal |
 |---|---|---|
-| [Milestone 1](docs/milestones/m1.md) | 11/11 | Profile the baseline, store reference tensors, run the DiT MLP block in one launch |
-| [Milestone 2](docs/milestones/m2.md) | 11/18 | Finish fusing the encoder, DiT and decoder, and measure each one |
+| [Milestone 1](docs/milestones/m1.md) | 11/11 | Profile the baseline and run the DiT MLP block in one launch inside FastVideo |
+| [Milestone 2](docs/milestones/m2.md) | 11/18 | Do the same for the attention half of the DiT, the text encoder and the decoders, and compare each with FastVideo |
 | [Milestone 3](docs/milestones/m3.md) | 11/30 | Integrate all stages into one megakernel |
 | [Final](docs/milestones/final.md) | 12/6 | Test different prompts and report the results |
 
@@ -33,6 +33,8 @@ harness/    checkpoint weights, the FP32 reference, error checks and the L2 flus
 stages/     text_encoder, dit, video_decoder, audio_decoder
 skeleton/   the final single launch
 results/    measured numbers
+FastVideo/  FastVideo at ce970eb, as a submodule
+third_party/  HuggingArch with an H3 overlay, as a submodule
 ```
 
 ### Checkpoint
@@ -69,6 +71,8 @@ This table shows the whole pipeline with every model on the GPU.
 | Whole request | 31.0 s | 11.0 s |
 
 From the table, the DiT is 84% of a 1344x768 request and the video decoder is 14%. The first request peaks at 68,385 MiB, which leaves 29,502 MiB free. Our kernels' buffers have to fit in that, and we have not measured them yet.
+
+In Milestone 1 we replaced the MLP half of every DiT block. The request went from 30.84 s to 29.10 s. FlashInfer's fused kernels account for 1.71 s of that, and running them as one launch adds 0.03 s. Details are in [Milestone 1](docs/milestones/m1.md).
 
 ### Credits
 
