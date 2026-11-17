@@ -1,17 +1,5 @@
-"""The DiT MLP block in one launch, built from FlashInfer's own SM120 kernels.
-
-FlashInfer (Apache-2.0) ships flashinfer.diffusion_ops.minimax_h3_mlp_nvfp4_sm120: RMSNorm + AdaLN + quantize,
-FC1 + SwiGLU (+ quantize y) and FC2 + gated residual as three persistent launches. fuse() reads that generated
-source from the installed package, copies the three kernels into device functions and calls them as phases of
-one persistent kernel; FlashInfer's own kernels and entry points stay as they are. Nothing of FlashInfer is copied
-into this repo: the edited source is written next to the original at build time and compiled by FlashInfer's JIT.
-
-Every CTA runs its norm rows, then its FC1 tiles, then its FC2 tiles. FC1 waits on per-128-row counters that the
-norm phase releases row by row; FC2 waits on per-256-row counters that FC1 releases tile by tile (FC2 already
-acquires them and fences the async proxy before its TMA loads). All CTAs are resident and a tile only waits on
-earlier phases, so no CTA waits on one that has not started. The math is FlashInfer's, so the output is bitwise
-equal to minimax_h3_mlp_nvfp4_sm120.
-"""
+# the dit mlp block in one launch, built from flashinfer's own sm120 kernels
+# fuse() edits the installed flashinfer source at build time, so none of its code is in this repo
 import functools
 from pathlib import Path
 
@@ -69,11 +57,9 @@ def _workspaces(m, dev):
             torch.empty(-(-m // 256), dtype=torch.int32, device=dev))
 
 
+# out = residual + gate[idx] * mlp(adaln(rmsnorm(x))) in flashinfer's three launches
+# module=None goes through the public api; the compiled module skips its python checks, like run_one_launch()
 def run(x, norm_w, scale, shift, idx, gate, residual, p, eps, module=None):
-    """out = residual + gate[idx] * MLP(AdaLN(RMSNorm(x))) with FlashInfer's three launches.
-
-    module=None goes through the public api; FlashInfer's compiled module skips its Python checks, so it costs the
-    same host time as run_one_launch()."""
     if module is None:
         from flashinfer.diffusion_ops import minimax_h3_mlp_nvfp4_sm120
 
@@ -93,8 +79,8 @@ def flashinfer_module():
     return _get_module()
 
 
+# the same block in one launch; trace (int64 [SMs, 4]) gets each cta's start and phase ends in ns
 def run_one_launch(x, norm_w, scale, shift, idx, gate, residual, p, eps, module=None, trace=None):
-    """The same block in one launch; trace (int64 [SMs, 4]) receives each CTA's start and phase ends (ns)."""
     module = module or build()
     m, dev = x.shape[0], x.device
     out = torch.empty_like(x)
@@ -121,9 +107,7 @@ def build():
     return spec.build_and_load()
 
 
-# ----------------------------------------------------------------------------------------------------------------
-# source edits; each anchor must match exactly once, so a FlashInfer update fails loudly instead of patching wrong
-# ----------------------------------------------------------------------------------------------------------------
+# source edits: each anchor must match exactly once, so a flashinfer update fails loudly
 
 def _replace(text, old, new, count=1):
     found = text.count(old)
@@ -141,7 +125,7 @@ def _block(src, ns):  # a namespace and the #undef lines that follow it
     return src[start:end]
 
 
-# a copy of one kernel as a device function; bid and num_bids, which drive every persistent loop, become arguments
+# a copy of one kernel as a device function, with bid and num_bids as arguments
 def _to_device(block, ns, new_ns, extra_params):
     b = block.replace(f"namespace {ns} {{", f"namespace {new_ns} {{")
     b = b.replace(f"}}  // namespace {ns}", f"}}  // namespace {new_ns}")
@@ -154,7 +138,7 @@ def _to_device(block, ns, new_ns, extra_params):
     return b[:sig_end] + ", int h3mk_bid, int h3mk_nbids" + extra_params + b[sig_end:]
 
 
-# norm: three groups of 128 threads per CTA, each on its own rows, shared memory slot and barrier
+# norm: three groups of 128 threads per cta, each with its own rows, shared memory slot and barrier
 def _norm(src):
     ns = "h3_mlp_norm_adaln_quant_nvfp4_sm120a"
     b = _to_device(_block(src, ns), ns, "h3mk_norm", ", int h3mk_group, unsigned int* __restrict__ h3mk_flags_a")
@@ -173,7 +157,7 @@ def _norm(src):
                      "asm volatile(\"bar.sync %0, 128;\" :: \"r\"(1 + h3mk_group) : \"memory\");  // h3mk: one group")
 
 
-# FC1's tiles go 16 m-tiles at a time (GROUP_M), so the producer waits once per group for all of its rows
+# fc1's tiles go 16 m-tiles at a time (GROUP_M), so the producer waits once per group
 _FC1_WAIT = '''                    const int h3mk_group_tile = tile / (GROUP_M * 112);
                     if (h3mk_group_tile != h3mk_last_group) {
                         if (elect_sync()) {  // h3mk: the norm phase has written the rows of this group
@@ -192,8 +176,8 @@ _FC1_WAIT = '''                    const int h3mk_group_tile = tile / (GROUP_M *
                     }
 '''
 
-# FC1 leaves 224 registers in warps 0-7 and 56 in warps 8-11; FC2 wants the opposite split, so return to the
-# launch's 168 first. FC2 also places its mbarriers where FC1's were.
+# fc1 leaves 224 registers in warps 0-7 and 56 in warps 8-11 and fc2 wants the opposite, so go back to 168
+# first; fc2 also puts its mbarriers where fc1's were
 _FC1_EXIT = '''    __syncthreads();  // h3mk: every role is done with this phase
     if (warp == 0 && lane == 0) {
         for (int i = 0; i < 6; ++i)
@@ -208,7 +192,7 @@ _FC1_EXIT = '''    __syncthreads();  // h3mk: every role is done with this phase
 '''
 
 
-# FC1: wait for the norm rows, release each stored 128 x 128 tile of y for its 256 rows, hand over to FC2
+# fc1: wait for the norm rows, release each stored 128 x 128 tile of y, hand over to fc2
 def _fc1(src):
     ns = "h3_mlp_fc1_nvfp4_sm120a"
     b = _to_device(_block(src, ns), ns, "h3mk_fc1",
@@ -232,7 +216,7 @@ def _fc1(src):
     return _replace(b, "    // Cleanup\n}\n", "    // Cleanup\n" + _FC1_EXIT + "}\n")
 
 
-# FC2: its wait loop stays; the count it waits for is now FC1's 2 x 112 tiles per 256 rows (112 for a short last one)
+# fc2: its wait loop now counts fc1's 2 x 112 tiles per 256 rows (112 for a short last one)
 def _fc2(src):
     ns = "h3_mlp_fc2_nvfp4_sm120a"
     b = _to_device(_block(src, ns), ns, "h3mk_fc2", "")
@@ -309,7 +293,7 @@ _LAUNCH = '''  // h3mk: norm, FC1 and FC2 in one persistent launch, one CTA per 
 ''' % (MEGA_SMEM, MEGA_SMEM)
 
 
-# host: a copy of FlashInfer's nvfp4 entry point (checks, tensor maps) whose three launches become one
+# host: a copy of flashinfer's nvfp4 entry point whose three launches become one
 def _host(src):
     head = "void minimax_h3_sm120_nvfp4_mlp("
     start = src.index(head)

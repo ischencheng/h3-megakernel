@@ -1,15 +1,5 @@
-"""Run the MLP half of each DiT block through FlashInfer's fused SM120 MLP, in three launches or in one.
-
-FastVideo's block does, after attention:
-  hidden, norm = fused_residual_gate_rmsnorm_modulate(hidden, attn, gate_msa, norm2.weight, scale_mlp, shift_mlp, idx, eps)
-  ff_out       = self.ff(norm)                      # quantize, FC1, SwiGLU, quantize, FC2
-  out          = _gated_residual(hidden, gate_mlp, idx, ff_out)
-The other arms keep the first call for its residual update, skip the feed-forward and replace the last call with
-RMSNorm, AdaLN, FC1, SwiGLU, FC2 and the gated residual on the checkpoint's own NVFP4 bytes repacked to
-FlashInfer's layout:
-  flashinfer_mlp   flashinfer.diffusion_ops.minimax_h3_mlp_nvfp4_sm120, three launches
-  mlp_one_launch   the same kernels as one persistent launch (stages/dit/fi_mlp.py)
-"""
+# runs the mlp half of each dit block on flashinfer's fused sm120 mlp, as three launches (flashinfer_mlp)
+# or as one persistent launch (mlp_one_launch, stages/dit/fi_mlp.py)
 import time
 
 import torch

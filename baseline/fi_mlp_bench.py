@@ -1,13 +1,5 @@
-"""FlashInfer's MLP block in three launches vs in one launch (stages/dit/fi_mlp.py), on block 0's weights.
-
-Both must give bitwise the same output. The two take turns in each timed round, so clock drift on the unlocked
-GPU hits them alike, and each round is compared as a pair. The one-launch build also records when each CTA ended
-its norm rows, its FC1 tiles and its FC2 tiles; --plot draws that per CTA. With --profile, a few calls of each run
-inside cudaProfilerStart/Stop for nsys.
-
-    python fi_mlp_bench.py --tokens 256 1024 4096 14830 37730 --profile 4096 37730
-    python fi_mlp_bench.py --plot ../results/fi-mlp-one-launch.json
-"""
+# times flashinfer's mlp block in three launches against one launch (stages/dit/fi_mlp.py) on block 0's weights
+# usage: python fi_mlp_bench.py --tokens 256 1024 4096 14830 37730 --profile 4096 37730, or --plot <json>
 import argparse
 import json
 import os

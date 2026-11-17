@@ -1,4 +1,4 @@
-"""Quick check of the one-launch MLP block: build it and compare with FlashInfer's three launches, bitwise."""
+# builds the one-launch mlp block and checks it bitwise against flashinfer's three launches
 import json
 import sys
 import time
