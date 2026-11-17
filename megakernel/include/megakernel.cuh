@@ -116,10 +116,14 @@ __device__ inline void mk_internal(const globals &g) {
 #endif
 
     if (kittens::warpid() < config::NUM_CONSUMER_WARPS) {
+#ifndef H3_SM120
         kittens::warpgroup::increase_registers<config::CONSUMER_REGISTERS>();
+#endif
         ::megakernel::consumer::main_loop<config, globals, ops...>(g, mks);
     } else {
+#ifndef H3_SM120
         kittens::warpgroup::decrease_registers<config::NON_CONSUMER_REGISTERS>();
+#endif
         switch (kittens::warpgroup::warpid()) {
         case 0:
             ::megakernel::loader::main_loop<config, globals, ops...>(g, mks);

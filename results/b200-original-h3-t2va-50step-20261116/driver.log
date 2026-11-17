@@ -1,0 +1,198 @@
+INFO 11-16 08:24:09.660 [__init__.py:47] CUDA is available
+GPU: NVIDIA B200, 183359 MiB, 610.57.04; original checkpoint: MiniMaxAI/MiniMax-H3@0919fb684102ef115126612f3fbb84d1027e7317 (T2VA); steps: 50
+INFO 11-16 08:24:11.993 [uniproc_executor.py:60] Initializing UniprocExecutor with master port: 28554
+INFO 11-16 08:24:12.381 [parallel_state.py:955] Initializing distributed environment with world_size=1, device=cuda:0
+INFO 11-16 08:24:12.381 [parallel_state.py:755] Using nccl backend for CUDA platform
+[W1116 08:24:12.428280647 ProcessGroupNCCL.cpp:1001] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+INFO 11-16 08:24:12.397 [__init__.py:39] Building pipeline of type: basic
+INFO 11-16 08:24:12.397 [registry.py:1320] Pinned pipeline class name MiniMaxH3ModularPipeline
+INFO 11-16 08:24:12.397 [pipeline_registry.py:153] Loading pipelines for types: ['basic']
+INFO 11-16 08:24:12.630 [pipeline_registry.py:195] Loaded 54 pipeline classes across 1 types
+INFO 11-16 08:24:12.631 [utils.py:544] Model already exists locally at /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317
+INFO 11-16 08:24:12.631 [__init__.py:56] Model path: /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317
+INFO 11-16 08:24:12.631 [profiler.py:198] Torch profiler disabled; returning no-op controller
+INFO 11-16 08:24:12.631 [composed_pipeline_base.py:172] Loading pipeline modules...
+INFO 11-16 08:24:12.631 [minimax_h3_pipeline.py:470] MiniMax-H3 sequential module load auto=False (unified_memory=False)
+INFO 11-16 08:24:12.631 [utils.py:544] Model already exists locally at /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317
+INFO 11-16 08:24:12.631 [composed_pipeline_base.py:485] Model path: /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317
+INFO 11-16 08:24:12.634 [utils.py:696] Diffusers version: 0.36.0.dev0
+INFO 11-16 08:24:12.637 [composed_pipeline_base.py:556] Loading pipeline modules from config: {'_class_name': 'MiniMaxH3ModularPipeline', '_diffusers_version': '0.36.0.dev0', '_blocks_class_name': 'MiniMaxH3Blocks', 'text_encoder': ['transformers', 'Qwen3VLForConditionalGeneration', {'type_hint': ['transformers', 'Qwen3VLForConditionalGeneration'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'text_encoder', 'variant': None, 'revision': None}], 'tokenizer': ['transformers', 'Qwen2TokenizerFast', {'type_hint': ['transformers', 'Qwen2TokenizerFast'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'tokenizer', 'variant': None, 'revision': None}], 'processor': ['transformers', 'Qwen3VLProcessor', {'type_hint': ['transformers', 'Qwen3VLProcessor'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'processor', 'variant': None, 'revision': None}], 'vae': ['diffusers', 'AutoencoderKLMiniMaxH3', {'type_hint': ['diffusers', 'AutoencoderKLMiniMaxH3'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'vae', 'variant': None, 'revision': None}], 'audio_vae': ['diffusers', 'AutoencoderKLMiniMaxH3Audio', {'type_hint': ['diffusers', 'AutoencoderKLMiniMaxH3Audio'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'audio_vae', 'variant': None, 'revision': None}], 'transformer': ['diffusers', 'MiniMaxH3Transformer3DModel', {'type_hint': ['diffusers', 'MiniMaxH3Transformer3DModel'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'transformer', 'variant': None, 'revision': None}], 'transformer_ref': ['diffusers', 'MiniMaxH3Transformer3DModel', {'type_hint': ['diffusers', 'MiniMaxH3Transformer3DModel'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'transformer_ref', 'variant': None, 'revision': None}], 'scheduler': ['diffusers', 'MiniMaxH3Scheduler', {'type_hint': ['diffusers', 'MiniMaxH3Scheduler'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'scheduler', 'variant': None, 'revision': None}], 'audio_scheduler': ['diffusers', 'MiniMaxH3Scheduler', {'type_hint': ['diffusers', 'MiniMaxH3Scheduler'], 'pretrained_model_name_or_path': 'MiniMaxAI/MiniMax-H3', 'subfolder': 'audio_scheduler', 'variant': None, 'revision': None}]}
+INFO 11-16 08:24:12.637 [composed_pipeline_base.py:595] Loading required modules: ['text_encoder', 'tokenizer', 'processor', 'vae', 'audio_vae', 'transformer', 'scheduler', 'audio_scheduler']
+INFO 11-16 08:24:12.637 [composed_pipeline_base.py:600] Skipping non-module config entry _blocks_class_name=MiniMaxH3Blocks
+INFO 11-16 08:24:12.638 [component_loader.py:1659] Loading text_encoder using transformers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/text_encoder
+INFO 11-16 08:24:12.640 [component_loader.py:333] HF Model config: {'architectures': ['Qwen3VLForConditionalGeneration'], 'image_token_id': 151655, 'text_config': {'attention_bias': False, 'attention_dropout': 0.0, 'bos_token_id': 151643, 'dtype': 'bfloat16', 'eos_token_id': 151645, 'head_dim': 128, 'hidden_act': 'silu', 'hidden_size': 5120, 'initializer_range': 0.02, 'intermediate_size': 25600, 'max_position_embeddings': 262144, 'model_type': 'qwen3_vl_text', 'num_attention_heads': 64, 'num_hidden_layers': 64, 'num_key_value_heads': 8, 'rms_norm_eps': 1e-06, 'rope_scaling': {'mrope_interleaved': True, 'mrope_section': [24, 20, 20], 'rope_type': 'default'}, 'rope_theta': 5000000, 'use_cache': True, 'vocab_size': 151936}, 'tie_word_embeddings': False, 'video_token_id': 151656, 'vision_config': {'deepstack_visual_indexes': [8, 16, 24], 'depth': 27, 'hidden_act': 'gelu_pytorch_tanh', 'hidden_size': 1152, 'in_channels': 3, 'initializer_range': 0.02, 'intermediate_size': 4304, 'model_type': 'qwen3_vl', 'num_heads': 16, 'num_position_embeddings': 2304, 'out_hidden_size': 5120, 'patch_size': 16, 'spatial_merge_size': 2, 'temporal_patch_size': 2}, 'vision_end_token_id': 151653, 'vision_start_token_id': 151652}
+
+Loading safetensors checkpoint shards:   0% Completed | 0/14 [00:00<?, ?it/s]
+
+Loading safetensors checkpoint shards:   7% Completed | 1/14 [00:02<00:35,  2.74s/it]
+
+Loading safetensors checkpoint shards:  14% Completed | 2/14 [00:04<00:28,  2.33s/it]
+
+Loading safetensors checkpoint shards:  21% Completed | 3/14 [00:06<00:24,  2.18s/it]
+
+Loading safetensors checkpoint shards:  29% Completed | 4/14 [00:08<00:20,  2.05s/it]
+
+Loading safetensors checkpoint shards:  36% Completed | 5/14 [00:10<00:19,  2.12s/it]
+
+Loading safetensors checkpoint shards:  43% Completed | 6/14 [00:13<00:17,  2.15s/it]
+
+Loading safetensors checkpoint shards:  50% Completed | 7/14 [00:15<00:15,  2.16s/it]
+
+Loading safetensors checkpoint shards:  57% Completed | 8/14 [00:17<00:13,  2.24s/it]
+
+Loading safetensors checkpoint shards:  64% Completed | 9/14 [00:19<00:11,  2.26s/it]
+
+Loading safetensors checkpoint shards:  71% Completed | 10/14 [00:22<00:09,  2.31s/it]
+
+Loading safetensors checkpoint shards:  79% Completed | 11/14 [00:24<00:07,  2.36s/it]
+
+Loading safetensors checkpoint shards:  86% Completed | 12/14 [00:27<00:04,  2.39s/it]
+
+Loading safetensors checkpoint shards:  93% Completed | 13/14 [00:29<00:02,  2.37s/it]
+
+Loading safetensors checkpoint shards: 100% Completed | 14/14 [00:31<00:00,  2.14s/it]
+
+Loading safetensors checkpoint shards: 100% Completed | 14/14 [00:31<00:00,  2.23s/it]
+
+INFO 11-16 08:24:44.256 [component_loader.py:482] Loading weights took 31.27 seconds
+INFO 11-16 08:24:44.266 [composed_pipeline_base.py:655] Loaded module text_encoder from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/text_encoder
+INFO 11-16 08:24:44.266 [component_loader.py:1659] Loading tokenizer using transformers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/tokenizer
+INFO 11-16 08:24:44.267 [component_loader.py:700] Loading tokenizer from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/tokenizer
+INFO 11-16 08:24:44.622 [component_loader.py:798] Loaded tokenizer: Qwen2Tokenizer
+INFO 11-16 08:24:44.623 [composed_pipeline_base.py:655] Loaded module tokenizer from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/tokenizer
+INFO 11-16 08:24:44.623 [component_loader.py:1659] Loading processor using transformers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/processor
+INFO 11-16 08:24:44.623 [component_loader.py:631] Loading processor from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/processor
+[ERROR] `min_frames` is part of Qwen3VLVideoProcessorInitKwargs, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.12/site-packages/transformers/models/qwen3_vl/video_processing_qwen3_vl.py.
+[ERROR] `max_frames` is part of Qwen3VLVideoProcessorInitKwargs, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.12/site-packages/transformers/models/qwen3_vl/video_processing_qwen3_vl.py.
+INFO 11-16 08:24:45.008 [component_loader.py:636] Loaded processor: Qwen3VLProcessor
+INFO 11-16 08:24:45.009 [composed_pipeline_base.py:655] Loaded module processor from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/processor
+INFO 11-16 08:24:45.009 [component_loader.py:1659] Loading vae using diffusers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/vae
+INFO 11-16 08:24:45.921 [cuda.py:174] Trying FASTVIDEO_ATTENTION_BACKEND=None
+INFO 11-16 08:24:45.921 [cuda.py:175] Selected backend: AttentionBackendEnum.FLASH_ATTN
+INFO 11-16 08:24:45.922 [cuda.py:332] Cannot use FlashAttention-2 backend because the flash_attn package is not found. Make sure that flash_attn was built and installed (on by default).
+INFO 11-16 08:24:45.922 [cuda.py:339] Using Torch SDPA backend.
+INFO 11-16 08:25:06.848 [composed_pipeline_base.py:655] Loaded module vae from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/vae
+INFO 11-16 08:25:06.848 [component_loader.py:1659] Loading audio_vae using diffusers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/audio_vae
+/usr/local/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+/usr/local/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+INFO 11-16 08:25:07.912 [composed_pipeline_base.py:655] Loaded module audio_vae from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/audio_vae
+INFO 11-16 08:25:07.913 [component_loader.py:1659] Loading transformer using diffusers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer
+INFO 11-16 08:25:07.914 [component_loader.py:1229] transformer cls_name: MiniMaxH3Transformer3DModel
+INFO 11-16 08:25:08.111 [component_loader.py:1296] Loading model from 14 safetensors files: ['/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00001-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00002-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00003-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00004-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00005-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00006-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00007-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00008-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00009-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00010-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00011-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00012-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00013-of-00014.safetensors', '/__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer/diffusion_pytorch_model-00014-of-00014.safetensors']
+INFO 11-16 08:25:08.111 [component_loader.py:1305] Loading model from MiniMaxH3Transformer3DModel, default_dtype: torch.bfloat16
+INFO 11-16 08:25:08.111 [component_loader.py:1329] Worker 0 transformer attention backend: FLASH_ATTN
+INFO 11-16 08:25:08.118 [fsdp_load.py:413] Loading model with default_dtype: torch.bfloat16
+INFO 11-16 08:25:08.119 [minimax_h3.py:882] MiniMax H3 inference fusions enabled: modulate,qknorm_rope,swiglu (CUDA inference-only; grad-enabled forwards fall back to eager; torch.compile captures opaque custom-op boundaries).
+INFO 11-16 08:25:08.123 [cuda.py:174] Trying FASTVIDEO_ATTENTION_BACKEND=None
+INFO 11-16 08:25:08.123 [cuda.py:175] Selected backend: AttentionBackendEnum.FLASH_ATTN
+INFO 11-16 08:25:08.123 [cuda.py:332] Cannot use FlashAttention-2 backend because the flash_attn package is not found. Make sure that flash_attn was built and installed (on by default).
+INFO 11-16 08:25:08.123 [cuda.py:339] Using Torch SDPA backend.
+INFO 11-16 08:25:08.125 [cuda.py:174] Trying FASTVIDEO_ATTENTION_BACKEND=None
+INFO 11-16 08:25:08.125 [cuda.py:175] Selected backend: AttentionBackendEnum.FLASH_ATTN
+INFO 11-16 08:25:08.125 [cuda.py:332] Cannot use FlashAttention-2 backend because the flash_attn package is not found. Make sure that flash_attn was built and installed (on by default).
+INFO 11-16 08:25:08.125 [cuda.py:339] Using Torch SDPA backend.
+INFO 11-16 08:25:08.153 [fsdp_load.py:497] Loading transformer weights with to_cpu=False
+
+Loading safetensors checkpoint shards:   0% Completed | 0/14 [00:00<?, ?it/s]
+
+Loading safetensors checkpoint shards:   7% Completed | 1/14 [00:02<00:27,  2.11s/it]
+
+Loading safetensors checkpoint shards:  14% Completed | 2/14 [00:04<00:27,  2.30s/it]
+
+Loading safetensors checkpoint shards:  21% Completed | 3/14 [00:06<00:25,  2.35s/it]
+
+Loading safetensors checkpoint shards:  29% Completed | 4/14 [00:08<00:21,  2.16s/it]
+
+Loading safetensors checkpoint shards:  36% Completed | 5/14 [00:10<00:18,  2.06s/it]
+
+Loading safetensors checkpoint shards:  43% Completed | 6/14 [00:13<00:17,  2.19s/it]
+
+Loading safetensors checkpoint shards:  50% Completed | 7/14 [00:15<00:15,  2.20s/it]
+
+Loading safetensors checkpoint shards:  57% Completed | 8/14 [00:17<00:13,  2.29s/it]
+
+Loading safetensors checkpoint shards:  64% Completed | 9/14 [00:20<00:12,  2.40s/it]
+
+Loading safetensors checkpoint shards:  71% Completed | 10/14 [00:22<00:09,  2.41s/it]
+
+Loading safetensors checkpoint shards:  79% Completed | 11/14 [00:25<00:07,  2.41s/it]
+
+Loading safetensors checkpoint shards:  86% Completed | 12/14 [00:27<00:04,  2.35s/it]
+
+Loading safetensors checkpoint shards:  93% Completed | 13/14 [00:29<00:02,  2.24s/it]
+
+Loading safetensors checkpoint shards: 100% Completed | 14/14 [00:31<00:00,  2.14s/it]
+
+Loading safetensors checkpoint shards: 100% Completed | 14/14 [00:31<00:00,  2.25s/it]
+
+INFO 11-16 08:25:39.848 [component_loader.py:1382] Loaded model with 33.12B parameters
+INFO 11-16 08:25:39.849 [composed_pipeline_base.py:655] Loaded module transformer from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/transformer
+INFO 11-16 08:25:39.850 [composed_pipeline_base.py:631] Skipping module transformer_ref
+INFO 11-16 08:25:39.850 [component_loader.py:1659] Loading scheduler using diffusers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/scheduler
+INFO 11-16 08:25:39.854 [composed_pipeline_base.py:655] Loaded module scheduler from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/scheduler
+INFO 11-16 08:25:39.854 [component_loader.py:1659] Loading audio_scheduler using diffusers from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/audio_scheduler
+INFO 11-16 08:25:39.855 [composed_pipeline_base.py:655] Loaded module audio_scheduler from /__modal/volumes/vo-0X9zpwRmve1cFpVPfNPlVZ/hf/hub/models--MiniMaxAI--MiniMax-H3/snapshots/0919fb684102ef115126612f3fbb84d1027e7317/audio_scheduler
+INFO 11-16 08:25:39.855 [lora_pipeline.py:268] trainable_transformer_modules: dict_keys(['transformer'])
+INFO 11-16 08:25:39.855 [__init__.py:61] Pipelines instantiated
+Loaded original H3 in 87.9s; generating one clip
+INFO 11-16 08:25:39.859 [video_generator.py:898] 
+INFO 11-16 08:25:39.859 [video_generator.py:898]                       height: 768
+INFO 11-16 08:25:39.859 [video_generator.py:898]                        width: 1344
+INFO 11-16 08:25:39.859 [video_generator.py:898]                 video_length: 124
+INFO 11-16 08:25:39.859 [video_generator.py:898]                       prompt: During school recess, a student dribbles a basketball across an outdoor court, stops at the free-throw line, and shoots. The camera follows from the side, then holds as the ball arcs into the hoop and the net moves. Hear the ball bouncing, sneakers squeaking, and classmates chatting nearby.
+INFO 11-16 08:25:39.859 [video_generator.py:898]                       image_path: None
+INFO 11-16 08:25:39.859 [video_generator.py:898]                   neg_prompt: 
+INFO 11-16 08:25:39.859 [video_generator.py:898]                         seed: 1101
+INFO 11-16 08:25:39.859 [video_generator.py:898]                  infer_steps: 50
+INFO 11-16 08:25:39.859 [video_generator.py:898]        num_videos_per_prompt: 1
+INFO 11-16 08:25:39.859 [video_generator.py:898]               guidance_scale: 1.0
+INFO 11-16 08:25:39.859 [video_generator.py:898]                     n_tokens: 499968
+INFO 11-16 08:25:39.859 [video_generator.py:898]                   flow_shift: None
+INFO 11-16 08:25:39.859 [video_generator.py:898]      embedded_guidance_scale: None
+INFO 11-16 08:25:39.859 [video_generator.py:898]                   save_video: True
+INFO 11-16 08:25:39.859 [video_generator.py:898]                   output_path: /cache/runs/b200-original-h3-t2va-50step-20261116/original-h3.mp4
+INFO 11-16 08:25:39.859 [video_generator.py:898]         
+INFO 11-16 08:25:39.863 [minimax_h3_pipeline.py:181] MiniMax-H3 geometry from config: patch_size=(1, 2, 2) spatial_compression_ratio=16 latent_channels=24
+INFO 11-16 08:25:39.863 [composed_pipeline_base.py:223] Running prepare_for_compile for vae
+INFO 11-16 08:25:39.868 [composed_pipeline_base.py:233] Enabled torch.compile for 1 submodules in vae via _compile_conditions with kwargs={}
+INFO 11-16 08:25:39.868 [composed_pipeline_base.py:363] Torch Compile enabled for VAE
+INFO 11-16 08:25:39.868 [composed_pipeline_base.py:402] Creating pipeline stages...
+INFO 11-16 08:25:39.869 [minimax_h3_pipeline.py:470] MiniMax-H3 sequential module load auto=False (unified_memory=False)
+INFO 11-16 08:25:39.869 [minimax_h3_pipeline.py:470] MiniMax-H3 sequential module load auto=False (unified_memory=False)
+INFO 11-16 08:25:39.869 [composed_pipeline_base.py:787] Running pipeline stages: dict_keys(['input_preparation_stage', 'conditioning_stage', 'latent_preparation_stage', 'denoising_stage', 'video_decoding_stage', 'audio_decoding_stage'])
+INFO 11-16 08:25:39.869 [base.py:182] [input_preparation_stage|MiniMaxH3InputPreparationStage] Starting execution
+INFO 11-16 08:25:39.870 [base.py:190] [input_preparation_stage|MiniMaxH3InputPreparationStage] Execution completed in 0.09071499999890875 ms
+INFO 11-16 08:25:39.870 [base.py:193] [input_preparation_stage|MiniMaxH3InputPreparationStage] Memory peak_allocated=120.14 GiB reserved=120.26 GiB resident_after=120.14 GiB
+INFO 11-16 08:25:39.870 [base.py:182] [conditioning_stage|MiniMaxH3ConditioningStage] Starting execution
+INFO 11-16 08:25:40.339 [base.py:190] [conditioning_stage|MiniMaxH3ConditioningStage] Execution completed in 468.786405000003 ms
+INFO 11-16 08:25:40.340 [base.py:193] [conditioning_stage|MiniMaxH3ConditioningStage] Memory peak_allocated=120.18 GiB reserved=120.32 GiB resident_after=120.17 GiB
+INFO 11-16 08:25:40.380 [base.py:182] [latent_preparation_stage|MiniMaxH3LatentPreparationStage] Starting execution
+INFO 11-16 08:25:40.405 [base.py:190] [latent_preparation_stage|MiniMaxH3LatentPreparationStage] Execution completed in 23.945030999996675 ms
+INFO 11-16 08:25:40.405 [base.py:193] [latent_preparation_stage|MiniMaxH3LatentPreparationStage] Memory peak_allocated=120.20 GiB reserved=120.33 GiB resident_after=120.18 GiB
+INFO 11-16 08:25:40.406 [base.py:182] [denoising_stage|MiniMaxH3DenoisingStage] Starting execution
+INFO 11-16 08:25:40.452 [cuda.py:174] Trying FASTVIDEO_ATTENTION_BACKEND=None
+INFO 11-16 08:25:40.452 [cuda.py:175] Selected backend: AttentionBackendEnum.FLASH_ATTN
+INFO 11-16 08:25:40.452 [cuda.py:313] Cannot use FlashAttention-2 backend for dtype other than torch.float16 or torch.bfloat16.
+INFO 11-16 08:25:40.452 [cuda.py:339] Using Torch SDPA backend.
+INFO 11-16 08:31:00.832 [base.py:190] [denoising_stage|MiniMaxH3DenoisingStage] Execution completed in 320425.925207 ms
+INFO 11-16 08:31:00.833 [base.py:193] [denoising_stage|MiniMaxH3DenoisingStage] Memory peak_allocated=125.78 GiB reserved=128.33 GiB resident_after=120.20 GiB
+INFO 11-16 08:31:00.833 [base.py:182] [video_decoding_stage|MiniMaxH3VideoDecodingStage] Starting execution
+INFO 11-16 08:31:56.170 [base.py:190] [video_decoding_stage|MiniMaxH3VideoDecodingStage] Execution completed in 55336.90951099999 ms
+INFO 11-16 08:31:56.171 [base.py:193] [video_decoding_stage|MiniMaxH3VideoDecodingStage] Memory peak_allocated=123.39 GiB reserved=125.56 GiB resident_after=120.20 GiB
+INFO 11-16 08:31:56.217 [base.py:182] [audio_decoding_stage|MiniMaxH3AudioDecodingStage] Starting execution
+INFO 11-16 08:31:56.542 [base.py:190] [audio_decoding_stage|MiniMaxH3AudioDecodingStage] Execution completed in 325.2497359999893 ms
+INFO 11-16 08:31:56.543 [base.py:193] [audio_decoding_stage|MiniMaxH3AudioDecodingStage] Memory peak_allocated=120.56 GiB reserved=125.57 GiB resident_after=120.43 GiB
+INFO 11-16 08:31:56.544 [video_generator.py:1025] Generated successfully in 376.69 seconds
+INFO 11-16 08:31:56.603 [video_generator.py:1073] PostDecodeFrameProcessStage completed in 0.059 s
+INFO 11-16 08:31:57.558 [video_generator.py:1442] Wrote frames to ffmpeg stdin in 0.942 s
+INFO 11-16 08:31:57.645 [video_generator.py:1147] Saved video to /cache/runs/b200-original-h3-t2va-50step-20261116/original-h3.mp4
+INFO 11-16 08:31:57.645 [video_generator.py:1149] VideoSaveStage completed in 1.042 s
+INFO 11-16 08:31:57.645 [video_generator.py:1152] AudioMuxStage completed in 0.000 s
+INFO 11-16 08:31:57.646 [video_generator.py:1157] End-to-end latency: 377.79 seconds
+{"client_s": 377.7895154953003, "generation_s": 376.685584096, "peak_mib": 132220, "reported_peak_mb": 123320.12158203125, "video_path": "/cache/runs/b200-original-h3-t2va-50step-20261116/original-h3.mp4", "stages": {"input_preparation_stage": 9.071499999890875e-05, "conditioning_stage": 0.468786405000003, "latent_preparation_stage": 0.023945030999996675, "denoising_stage": 320.425925207, "video_decoding_stage": 55.33690951099999, "audio_decoding_stage": 0.3252497359999893, "PostDecodeFrameProcessStage": 0.058763963999979296, "VideoSaveStage": 1.0416944129999592, "AudioMuxStage": 0.0}, "streams": [{"codec_name": "h264", "width": 1344, "height": 768, "nb_frames": "124"}, {"codec_name": "aac", "sample_rate": "32000", "channels": 2, "nb_frames": "163"}]}
+INFO 11-16 08:31:57.987 [uniproc_executor.py:248] Shutting down UniprocExecutor...
+INFO 11-16 08:31:57.987 [gpu_worker.py:196] Worker 0 shutting down...
+INFO 11-16 08:31:59.115 [gpu_worker.py:205] Worker 0 shutdown complete
+INFO 11-16 08:31:59.115 [uniproc_executor.py:257] UniprocExecutor shutdown complete

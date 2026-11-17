@@ -7,9 +7,12 @@ namespace h3 {
 struct smoke_op : megakernel::NoOp<config> {
     static constexpr int opcode = h3::smoke;
     struct storer {
-        static __device__ void run(const globals &g, state &s) {
+        template <typename G>
+        static __device__ void run(const G &g, state &s) {
             if (kittens::laneid() == 0)
                 atomicAdd(g.completion_counts.raw_ptr + blockIdx.x, 1);
+            if (kittens::laneid() == 0)
+                g.physical_sm_ids.raw_ptr[blockIdx.x] = megakernel::get_smid();
         }
     };
 };

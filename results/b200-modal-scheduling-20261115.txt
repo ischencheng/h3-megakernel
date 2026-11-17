@@ -1,0 +1,8 @@
+Command:
+.venv/bin/modal app logs ap-X4kUZvnZskOI6UDdNnYBOp --source system --tail 20 --timestamps
+
+Correction (later on 2026-11-15): This was a scheduling message for one queued request, not proof that Starter cannot run B200. A minimal B200 probe subsequently succeeded, and both one-prompt H3 B200 benchmarks completed. See b200-h3-comparison-20261115.md.
+
+Output (retrieved 2026-11-15):
+2026-11-15 23:09:19-05:00 Function 'benchmark' (fu-RZ0wacSOWbxTjvuAWhUFAs) is waiting to be scheduled on a GPU_B200 worker. Your workspace's concurrency limits are reached (B200 unavailable on starter plan). Free up capacity or raise the limit to allow this function to be scheduled
+2026-11-15 23:10:53-05:00 Stopping app - keyboard interrupt received. Use `modal run --detach` to prevent KeyboardInterrupts from killing apps.

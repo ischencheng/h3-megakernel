@@ -11,6 +11,17 @@
 namespace megakernel {
 namespace controller {
 
+template <typename config, typename globals> struct controller_run_dispatcher {
+    template <typename op> struct dispatcher {
+        __device__ static inline void run(const globals &g,
+                                          ::megakernel::state<config> &s) {
+            if constexpr (requires { op::controller::run(g, s); }) {
+                op::controller::run(g, s);
+            }
+        }
+    };
+};
+
 template <typename config, typename globals, typename... ops>
 __device__ void main_loop(const globals &g, ::megakernel::state<config> &kvms) {
     auto laneid = ::kittens::laneid();
@@ -129,6 +140,13 @@ __device__ void main_loop(const globals &g, ::megakernel::state<config> &kvms) {
             // ready to roll!
             arrive(kvms.instruction_arrived[kvms.instruction_ring], 1);
         }
+        // An all-warp instruction joins the controller at this boundary.
+        // Ordinary operations have no controller run hook and keep the
+        // existing two-slot pipeline behavior.
+        dispatch_op<controller_run_dispatcher<config, globals>::dispatcher,
+                    ops...>::template run<void, config, globals,
+                                          ::megakernel::state<config>>(
+            opcode, g, kvms);
     }
 
     // invalidate remaining semaphores and write out remaining timings
