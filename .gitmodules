@@ -6,3 +6,6 @@
 	path = FastVideo
 	url = https://github.com/nshejwalkar/FastVideo.git
 	branch = h3-megakernel
+[submodule "ThunderKittens"]
+	path = ThunderKittens
+	url = https://github.com/HazyResearch/ThunderKittens.git
