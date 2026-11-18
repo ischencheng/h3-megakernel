@@ -9,7 +9,7 @@
 #include <iostream>
 
 // operations
-#define OPCODE_TEST 1
+#define OPCODE_ADDONE 1 // this is for practice
 
 // constants for h3 architecture
 
@@ -32,3 +32,18 @@
 #define H3_NUM_TILES 668
 
 
+using config =
+
+// use template if necessary?
+struct h3_globals {
+    megakernel::instruction_layout<config> instructions;
+    megakernel::timing_layout<config> timings;
+
+    kittens::gl<float, 1, 1, 1, -1> weights;
+
+    int sm_count;
+
+    dim3 grid() { return dim3(sm_count); }
+    dim3 block() { return dim3(config::NUM_THREADS); }
+    int dynamic_shared_memory() {return config::DYNAMIC_SHARED_MEMORY; }
+}
