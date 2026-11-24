@@ -36,9 +36,12 @@ using config = megakernel::default_config;
 
 
 struct globals_t {
-    // types 
     using instruction_layout = megakernel::instruction_layout<config>;
-    using test_t = kittens::gl<kittens::bf16, 1, -1, -1, H3_HIDDEN_DIM, kittens::st_bf<128, 64>>;
+    using timing_layout = megakernel::timing_layout<config>;
+
+    // kittens::gl encodes device pointer + 4D shape, Each dim either fixed at compile or -1, meaning it
+    // needs to be passed in construction
+    using test_t = kittens::gl<kittens::bf16, 1, 1, -1, H3_HIDDEN_DIM, kittens::st_bf<128, 64>>; // [rows, 5376]
 
     test_t input_weights;
     test_t output_weights;
