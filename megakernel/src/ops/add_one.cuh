@@ -34,12 +34,16 @@ struct AddOneOp : megakernel::NoOp<config> {
                                      {0, 0, s.instruction()[1], s.instruction()[2]}, // tile row, tile col
                                      s.semaphores()[0]);
         } else if (lane < config::NUM_PAGES) {
-            // release the 4 pages this op doesn't use, or the next instruction hangs
-            int pid = s.pid(lane);
-            s.wait_page_ready(pid);
+            // release the 4 pages this op doesn't use, take logical page 0
+            int pid = s.pid(lane); 
+            s.wait_page_ready(pid); // block until physical page is released
             s.finish_page(pid, config::NUM_CONSUMER_WARPS);
         }
     }
+    };
+    struct consumer {
+        template <typename globals>
+        static __device__ void run(const globals &g, state<config> &s) {}
     };
 
 
