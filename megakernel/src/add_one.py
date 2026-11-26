@@ -85,7 +85,34 @@ def run(mk, rows, mode):
     print(f"mode={mode:4s}  rows={rows:5d}  tiles={len(schedule.dag_nodes):5d}  "
           f"per_sm={globs.instructions.shape[1]:3d}  unwritten={missing}  "
           f"max_err={max_err}  {'PASS' if ok else 'FAIL'}")
+    print_timings(globs)
     return ok
+
+
+def print_timings(globs):
+    """Per-warp cycle counts from globs.timings, only for AddOne instructions.
+
+    Slots (megakernel/include/util.cuh:215): controller 0-4, loader start/end 5/6,
+    storer 9/10, consumer warp w start/end 11+2w / 12+2w. Values are clock64()
+    cycles since that SM's block started.
+    """
+    t = globs.timings.cpu().long()
+    is_add_one = globs.instructions[..., 0].cpu() == AddOne.opcode()
+    rows = t[is_add_one]  # [num_add_one_instructions, 128]
+    if rows.numel() == 0:
+        return
+
+    def span(a, b):
+        d = (rows[:, b] - rows[:, a]).float()
+        return f"median={d.median().item():8.0f}  max={d.max().item():8.0f}"
+
+    print(f"    timings over {rows.shape[0]} AddOne instructions (cycles):")
+    print(f"      controller (0->4): {span(0, 4)}")
+    print(f"      loader     (5->6): {span(5, 6)}")
+    print(f"      storer    (9->10): {span(9, 10)}")
+    for w in range(8):  # NUM_CONSUMER_WARPS
+        print(f"      consumer {w} ({11 + 2*w}->{12 + 2*w}): {span(11 + 2*w, 12 + 2*w)}")
+    print(f"      raw slots 0-26, first AddOne: {rows[0, :27].tolist()}")
 
 
 def main():
