@@ -54,7 +54,7 @@ struct AddOneOp : megakernel::NoOp<config> {
             kittens::wait(s.semaphores()[0], 0); // wait for data load semaphore
             kittens::rt_bf<16, 64> r; // this warp's share: 128 rows / 8 warps
             consumers::load(r, tile); // kittens group splits 128 rows across the 8 consumer warps
-            kittens::warp::add(r, r, kittens::bf16(1.0f)); // add one op (dst, lhs, rhs)
+            kittens::warp::add(r, r, __float2bfloat16(1.0f)); // add one op (dst, lhs, rhs)
             consumers::store(tile, r); // write this warp's rows from registers back to shared
 
             __syncwarp(); // all lanes' stores done before signaling

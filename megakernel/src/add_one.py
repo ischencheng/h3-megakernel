@@ -42,6 +42,7 @@ def build():
             "-Xcompiler=-Wno-psabi",
         ],
         extra_cflags=["-std=c++20"],
+        extra_ldflags=["-lcuda"],
         verbose=True,
     )
 
@@ -69,6 +70,7 @@ def run(mk, rows, mode):
     out = torch.full_like(x, float("nan"))  # NaN marks any tile the kernel never wrote
     globs = AddOneGlobals(device=x.device, input=x, output=out)
 
+    # these functions 
     schedule = make_schedule(globs, rows)
     queues = assign_to_sms(mode, schedule=schedule, memory_fraction=0.5)  # fraction only used by "pool"
     tensorize_instructions(globs, queues)  # pads with NoOps, sets globs.instructions / globs.timings
