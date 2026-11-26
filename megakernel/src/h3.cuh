@@ -43,7 +43,16 @@ struct globals_t {
     // needs to be passed in construction
     using test_t = kittens::gl<kittens::bf16, 1, 1, -1, H3_HIDDEN_DIM, kittens::st_bf<128, 64>>; // [rows, 5376]
 
+    // usage: g.instructions[{sm_id, i, 0}] and g.timings[{sm_id, i, 0}]
+    instruction_layout instructions; // [num_sms, num_instructions, INSTRUCTION_WIDTH]
+    timing_layout timings;           // [num_sms, num_instructions, TIMING_WIDTH]
+
     test_t input_weights;
     test_t output_weights;
 
-}
+    // launch shape for kittens::py::bind_kernel: one block per SM, since the
+    // runtime indexes instructions by get_smid(), not blockIdx.x
+    dim3 grid() { return dim3(instructions.depth()); }
+    dim3 block() { return dim3(config::NUM_THREADS); }
+    int dynamic_shared_memory() { return config::DYNAMIC_SHARED_MEMORY; }
+};

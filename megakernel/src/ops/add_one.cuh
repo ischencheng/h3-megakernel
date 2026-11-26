@@ -10,7 +10,9 @@ struct AddOneOp : megakernel::NoOp<config> {
         static __device__ int
         release_lid(const globals &g,
                     typename config::instruction_t &instruction, int &query) {
-            return query;
+            // pages in the order we free them: 1-4 right away, 0 after the store,
+            // so the next instruction's logical page 0 is one that's already free
+            return (query + 1) % config::NUM_PAGES;
         }
         template <typename globals>
         static __device__ int init_semaphores(const globals &g,
@@ -43,29 +45,35 @@ struct AddOneOp : megakernel::NoOp<config> {
     };
     struct consumer {
         template <typename globals>
-        static __device__ void run(const globals &g, state<config> &s) {
+        static __device__ void run(const globals &g, megakernel::state<config> &s) {
             // use thunderkittens consumers
             using consumers = kittens::group<config::NUM_CONSUMER_WARPS>;
-            /* get 64x64 tile */
+            // the 128x64 input tile in logical page 0
             auto& tile = *static_cast<kittens::st_bf<128, 64> *>(s.pages[s.pid(0)].ptr());
 
             kittens::wait(s.semaphores()[0], 0); // wait for data load semaphore
-            kittens::rt_bf<16, 64> r; 
+            kittens::rt_bf<16, 64> r; // this warp's share: 128 rows / 8 warps
             consumers::load(r, tile); // kittens group splits 128 rows across the 8 consumer warps
             kittens::warp::add(r, r, kittens::bf16(1.0f)); // add one op (dst, lhs, rhs)
-            consumers::store(tile, r); // write rows from register to shared?
+            consumers::store(tile, r); // write this warp's rows from registers back to shared
 
-            __syncwarp();
-            if (kittens::laneid() == 0) kittens::arrive(s.semaphores()[1]);
-
-
+            __syncwarp(); // all lanes' stores done before signaling
+            if (kittens::laneid() == 0) kittens::arrive(s.semaphores()[1]); // 1 of NUM_CONSUMER_WARPS
         }
     };
-        struct storer {
-        // Uses 4 full pages for outputs.
+    struct storer {
         template <typename globals>
-        static __device__ void run(const globals &g, state<config> &s) {
+        static __device__ void run(const globals &g, megakernel::state<config> &s) {
+            if (kittens::laneid() == 0) {
+                int pid = s.pid(0);
+                auto &tile = *static_cast<kittens::st_bf<128, 64> *>(s.pages[pid].ptr());
 
+                kittens::wait(s.semaphores()[1], 0); // all consumer warps finished writing
+                kittens::tma::store_async(g.output_weights, tile,
+                                          {0, 0, s.instruction()[1], s.instruction()[2]}); // same tile coords as load
+                kittens::tma::store_async_read_wait(); // TMA done reading smem, page safe to reuse
+                s.finish_page(pid, config::NUM_CONSUMER_WARPS); // release logical page 0
+            }
         }
     };
 
