@@ -43,7 +43,30 @@ struct AddOneOp : megakernel::NoOp<config> {
     };
     struct consumer {
         template <typename globals>
-        static __device__ void run(const globals &g, state<config> &s) {}
+        static __device__ void run(const globals &g, state<config> &s) {
+            // use thunderkittens consumers
+            using consumers = kittens::group<config::NUM_CONSUMER_WARPS>;
+            /* get 64x64 tile */
+            auto& tile = *static_cast<kittens::st_bf<128, 64> *>(s.pages[s.pid(0)].ptr());
+
+            kittens::wait(s.semaphores()[0], 0); // wait for data load semaphore
+            kittens::rt_bf<16, 64> r; 
+            consumers::load(r, tile); // kittens group splits 128 rows across the 8 consumer warps
+            kittens::warp::add(r, r, kittens::bf16(1.0f)); // add one op (dst, lhs, rhs)
+            consumers::store(tile, r); // write rows from register to shared?
+
+            __syncwarp();
+            if (kittens::laneid() == 0) kittens::arrive(s.semaphores()[1]);
+
+
+        }
+    };
+        struct storer {
+        // Uses 4 full pages for outputs.
+        template <typename globals>
+        static __device__ void run(const globals &g, state<config> &s) {
+
+        }
     };
 
 
