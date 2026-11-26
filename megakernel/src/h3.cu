@@ -14,7 +14,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     kittens::py::bind_kernel<megakernel::mk<config, globals_t,
                                       AddOneOp>>(
         m, "h3",
-        &globals_t::instructions,
+        &globals_t::instructions, // these are the 4 args
         &globals_t::timings,
         &globals_t::input_weights,
         &globals_t::output_weights);

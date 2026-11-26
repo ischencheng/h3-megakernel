@@ -15,8 +15,8 @@ from instructions import (
     NoOp,
 )
 
-INTS_PER_INSTRUCTION = 32
-TIMING_SLOTS = 128
+INTS_PER_INSTRUCTION = 32 # change this if want to use less memory per instruction, needs to match config.cuh
+TIMING_SLOTS = 128 # timing output for measuring performance
 
 
 @dataclass
@@ -295,7 +295,7 @@ def tensorize_instructions(
 
     flattened = []
     for queue in instruction_queues:
-        flattened.extend(serialize_and_pad(instruction) for instruction in queue)
+        flattened.extend(serialize_and_pad(instruction) for instruction in queue) # turns it into fixed width 32 ints
 
     device = globs.device
 

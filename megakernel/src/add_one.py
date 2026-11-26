@@ -73,7 +73,8 @@ def run(mk, rows, mode):
     queues = assign_to_sms(mode, schedule=schedule, memory_fraction=0.5)  # fraction only used by "pool"
     tensorize_instructions(globs, queues)  # pads with NoOps, sets globs.instructions / globs.timings
 
-    mk.h3(globs.instructions, globs.timings, globs.input, globs.output)
+    # mk is pybind module from build() / h3.cu created in main
+    mk.h3(globs.instructions, globs.timings, globs.input, globs.output) # 4 args
     torch.cuda.synchronize()
 
     missing = torch.isnan(out).sum().item()
