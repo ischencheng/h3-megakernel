@@ -50,7 +50,10 @@ struct globals_t {
     using test_t = kittens::gl<kittens::bf16, 1, 1, -1, H3_HIDDEN_DIM, kittens::st_bf<128, 64>>; // [rows, 5376]
 
     using hidden_t = kittens::gl<kittens::bf16, 1, 1, -1, H3_HIDDEN_DIM, kittens::st_bf<128, 64>>; // [S, 5376], hidden dim for DiT
-
+    using hidden_col_t = kittens::gl<kittens::bf16, 1, 1, 1, H3_HIDDEN_DIM>; // [5376] shape
+    using adaln_table_t = kittens::gl<kittens::bf16, 1, 1, -1, -1>; // [unique timesteps, row stride], shift/scale/gate at offsets
+    using token_index_t = kittens::gl<int, 1, 1, 1, -1>; // [S], which table row each token uses
+ 
 
     // usage: g.instructions[{sm_id, i, 0}] and g.timings[{sm_id, i, 0}]
     instruction_layout instructions; // [num_sms, num_instructions, INSTRUCTION_WIDTH]
@@ -60,6 +63,9 @@ struct globals_t {
     test_t output_weights;
 
     hidden_t x; // hidden weights of Dit
+    hidden_col_t norm_weight_vec; // weights per dim for RMS norm
+    adaln_table_t adaln_table; // AdaLN modulation table, one row per unique timestep
+    token_index_t adaln_index; // table row for each token
 
     // launch shape for kittens::py::bind_kernel: one block per SM, since the
     // runtime indexes instructions by get_smid(), not blockIdx.x

@@ -91,6 +91,24 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 }
             }
 
+            // modulation setup, once per instruction: this lane's two rows and the table rows they use.
+            // register layout of xf (per 16x16 sub-tile j, per lane): data[0] = top row, cols 2*(lane%4), +1
+            //   data[1] = bottom row, same cols; data[2] = top row, cols +8, +9; data[3] = bottom row, cols +8, +9
+            //   top row = lane/4, bottom row = lane/4 + 8 (of this warp's 16)
+            const int lane = kittens::laneid();
+            const int w = kittens::warpid();
+            const int warp_row0 = s.instruction()[1] * 128 + 16 * (w / 4 + (w % 4) * 2); // group::load's warp -> rows mapping
+            const int row_top = warp_row0 + lane / 4, row_bot = row_top + 8;
+            const int S = g.x.rows();
+            const int t_top = row_top < S ? g.adaln_index.raw_ptr[row_top] : 0; // rows past S (last tile): any valid table row, output never written
+            const int t_bot = row_bot < S ? g.adaln_index.raw_ptr[row_bot] : 0;
+            const int shift_off = s.instruction()[2], scale_off = s.instruction()[3]; // column offsets into a table row (norm1: base, base+H; norm2: base+3H, base+4H)
+            const long long stride = g.adaln_table.cols();
+            const kittens::bf16 *shift_top = g.adaln_table.raw_ptr + t_top * stride + shift_off;
+            const kittens::bf16 *scale_top = g.adaln_table.raw_ptr + t_top * stride + scale_off;
+            const kittens::bf16 *shift_bot = g.adaln_table.raw_ptr + t_bot * stride + shift_off;
+            const kittens::bf16 *scale_bot = g.adaln_table.raw_ptr + t_bot * stride + scale_off;
+
             // here the x^2 sum is complete in sum, now we go to second pass for calculating normed value and doing mod/quant
             for (; i < 2 * NUM_CHUNKS; ++i) {
                 const int logical_slot = i % config::NUM_PAGES;
@@ -102,6 +120,48 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // load the rows for this consumer warp
 
                 // calculation for second phase: 
+                kittens::warp::mul(xf, xf, sum); // sum = inv rms
+
+                // multiply by the learned weight (final part of rms norm)
+                kittens::rt_fl<16, 64>::row_vec wv; // one value per column, laid out to match xf
+                kittens::warp::load(wv, g.norm_weight_vec, {0, 0, 0, i - NUM_CHUNKS}); // this chunk's 64 columns, bf16 -> FP32
+                kittens::warp::mul_col(xf, xf, wv); // each column * its weight
+
+
+                // look up table row and scale + shift (modulation) y = y * (1 + scale[t, col]) + shift[t, col]
+                const int col0 = (i - NUM_CHUNKS) * CHUNK_COLS; // first column of this chunk
+                #pragma unroll
+                for (int j = 0; j < xf.width; ++j) { // 4 sub-tiles of 16 columns
+                    auto &d = xf.tiles[0][j].data;
+                    #pragma unroll
+                    for (int k = 0; k < 4; ++k) {
+                        const int c = col0 + 16 * j + 2 * (lane % 4) + (k >= 2 ? 8 : 0); // d[k].x is column c, d[k].y is c + 1
+                        const kittens::bf16 *sc = (k & 1) ? scale_bot : scale_top; // entries for bottom row bc odd k
+                        const kittens::bf16 *sh = (k & 1) ? shift_bot : shift_top;
+                        d[k].x = d[k].x * (1.0f + __bfloat162float(sc[c]))     + __bfloat162float(sh[c]);
+                        d[k].y = d[k].y * (1.0f + __bfloat162float(sc[c + 1])) + __bfloat162float(sh[c + 1]);
+                    }
+                }
+
+                // round to bf16 then back to float (why does recipe have us do this?)
+                kittens::rt_bf<16, 64> yb;
+                kittens::warp::copy(yb, xf); // rounds to nearest even
+                kittens::warp::copy(xf, yb); // converts back exact
+
+                // find amax (abs value maximum) per row per block (16 col)
+                // amax[j].data[0][0].x = top row's amax for block j, .y = bottom row's
+                kittens::rt_fl<16, 16> blk;
+                kittens::rt_fl<16, 16>::col_vec amax[4];
+                #pragma unroll
+                for (int j = 0; j < 4; ++j) {
+                    blk.tiles[0][0] = xf.tiles[0][j];
+                    kittens::warp::abs(blk, blk);
+                    kittens::warp::row_max(amax[j], blk);
+                }
+
+
+
+                // compute scale and quantize
 
             }
 
