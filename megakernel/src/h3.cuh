@@ -23,6 +23,9 @@ using config = megakernel::default_config;
 #define H3_HIDDEN_DIM 5376 // repeat but leaving in in case i use both in different places
 #define CHUNK_COLS 64 // how many columns are in one chunk (16 rows, 64 of hidden dim columns)
 #define NUM_CHUNKS (HIDDEN_DIM / CHUNK_COLS)
+#define NORM_EPS 1e-5f // the epsilon that fastvideo uses for RMSNorm calcs
+
+
 #define H3_NUM_BLOCKS 50
 #define H3_NUM_STEPS 8
 #define H3_FFN_DIM 14336

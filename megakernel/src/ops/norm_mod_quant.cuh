@@ -85,7 +85,7 @@ struct NormModQuantOp : megakernel::NoOp<config> {
             // calculate inv
             kittens::rt_fl<16, 64>::col_vec inv;
             for (int j = 0; j < 16; ++j) {
-                inv[j] = rsqrt(sum[j] / HIDDEN_DIM + eps); // TODO: figure out how epsilon is stored in model. Is this in globals_t loaded?
+                inv[j] = rsqrt(sum[j] / HIDDEN_DIM + NORM_EPS);
             }
 
             // here the x^2 sum is complete in sum, now we go to second pass for calculating normed value and doing mod/quant
