@@ -22,9 +22,18 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         template <typename globals>
         static __device__ int init_semaphores(const globals &g,
                                               megakernel::state<config> &s) {
-            kittens::init_semaphore(s.semaphores()[0], 1); // loaded
-            kittens::init_semaphore(s.semaphores()[1], config::NUM_CONSUMER_WARPS); // each consumer completed
-            return 2; // 2 semaphores used
+            // semaphores [0 .. 4] for the pages being full and ready to use
+            // semaphores [5 .. 9] for the pages being empty and ready to load into
+            // load each with NUM_CHUNKS * 2 / 5?
+            #pragma unroll
+            for (int i = 0; i < config::NUM_PAGES; ++i) {
+                kittens::init_semaphore(s.semaphores()[i], 1); // loaded
+            }
+            #pragma unroll
+            for (int i = config::NUM_PAGES; i < config::NUM_PAGES * 2; ++i) {
+                kittens::init_semaphore(s.semaphores()[i], config::NUM_CONSUMER_WARPS); // computation completed, requires all consumer warps to finish
+            }
+            return config::NUM_PAGES * 2; // 2 semaphores used per shared memory page
         }
     };
 
