@@ -66,15 +66,20 @@ struct NormModQuantOp : megakernel::NoOp<config> {
     struct consumer {
         template <typename globals>
         static __device__ void run(const globals &g, state<config> &s) {
-            kittens::wait(s.semaphores()[0], 0); // wait for loader: first 128x64 chunk is in logical page 0
-            auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[s.pid(0)].data);
-            kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
-            kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // warp w gets rows 16w..16w+15, bf16 -> FP32 on load
-            kittens::warp::mul(xf, xf, xf); // x^2
             typename kittens::rt_fl<16, 64>::col_vec sum; // one FP32 value per row (16 rows)
             kittens::warp::zero(sum);
-            kittens::warp::row_sum(sum, xf, sum); // sum += each row's x^2 over this chunk's 64 columns (2-arg form overwrites)
-            // TODO: wrap the load..row_sum in a loop over the 84 chunks (zero sum once, before the loop)
+            for (int i = 0; i < NUM_CHUNKS; ++i) {
+                const int logical_slot = i % config::NUM_PAGES;
+                const int page_id = s.pid(logical_slot);
+                kittens::wait(s.semaphores()[logical_slot], (i / config::NUM_PAGES) & 1); // chunk i is ready
+
+                auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
+                kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
+                kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // load the rows for this consumer warp
+
+                kittens::warp::mul(xf, xf, xf); // x^2
+                kittens::warp::row_sum(sum, xf, sum); // accumulate by the 16 rows
+            }
         }
     };
 };
