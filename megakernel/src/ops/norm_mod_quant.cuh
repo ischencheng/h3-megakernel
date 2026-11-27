@@ -46,7 +46,7 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         static __device__ void run(const globals &g, megakernel::state<config> &s) {
             if (kittens::laneid() != 0) return; // one thread issues every TMA load
             const int row_tile = s.instruction()[1]; // same 128 rows for every chunk; only the column tile changes
-            for (int i = 0; i < NUM_CHUNKS; i++) { // TODO: 2 * NUM_CHUNKS once pass 2 reloads the row
+            for (int i = 0; i < 2 * NUM_CHUNKS; i++) { 
                 const int slot = i % config::NUM_PAGES;
                 const int page_id = s.pid(slot);
                 if (i < config::NUM_PAGES) s.wait_page_ready(page_id); // wait page ready gets ownership of this page from a previous instruction
@@ -68,7 +68,8 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         static __device__ void run(const globals &g, state<config> &s) {
             typename kittens::rt_fl<16, 64>::col_vec sum; // one FP32 value per row (16 rows)
             kittens::warp::zero(sum);
-            for (int i = 0; i < NUM_CHUNKS; ++i) {
+            int i = 0;
+            for (; i < NUM_CHUNKS; ++i) {
                 const int logical_slot = i % config::NUM_PAGES;
                 const int page_id = s.pid(logical_slot);
                 kittens::wait(s.semaphores()[logical_slot], (i / config::NUM_PAGES) & 1); // chunk i is ready
@@ -80,6 +81,27 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 kittens::warp::mul(xf, xf, xf); // x^2
                 kittens::warp::row_sum(sum, xf, sum); // accumulate by the 16 rows
             }
+
+            // calculate inv
+            kittens::rt_fl<16, 64>::col_vec inv;
+            for (int j = 0; j < 16; ++j) {
+                inv[j] = rsqrt(sum[j] / HIDDEN_DIM + eps); // TODO: figure out how epsilon is stored in model. Is this in globals_t loaded?
+            }
+
+            // here the x^2 sum is complete in sum, now we go to second pass for calculating normed value and doing mod/quant
+            for (; i < 2 * NUM_CHUNKS; ++i) {
+                const int logical_slot = i % config::NUM_PAGES;
+                const int page_id = s.pid(logical_slot);
+                kittens::wait(s.semaphores()[logical_slot], (i / config::NUM_PAGES) & 1); // chunk i is ready
+
+                auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
+                kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
+                kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // load the rows for this consumer warp
+
+                // calculation for second phase: 
+
+            }
+
         }
     };
 };
