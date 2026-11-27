@@ -13,6 +13,7 @@ using config = megakernel::default_config;
 // operations
 #define OPCODE_TEST 1
 #define OPCODE_ADD_ONE 2 // for writing with add_one
+#define OPCODE_NORM_MOD_QUANT 3
 
 // constants for h3 architecture
 

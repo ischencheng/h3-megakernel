@@ -12,7 +12,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // name: python func name
     // remaining python args, which are the input weights and output weight storage
     kittens::py::bind_kernel<megakernel::mk<config, globals_t,
-                                      AddOneOp>>(
+                                      AddOneOp, NormModQuantOp>>(
         m, "h3",
         &globals_t::instructions, // these are the 4 args
         &globals_t::timings,

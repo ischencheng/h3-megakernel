@@ -45,7 +45,7 @@ struct default_config {
     static constexpr int NUM_PAGES = DYNAMIC_SHARED_MEMORY / PAGE_SIZE;
     static_assert(NUM_PAGES == 5, "NUM_PAGES should be 5");
 
-    static constexpr bool TIMING_RECORD_ENABLED = false;
+    static constexpr bool TIMING_RECORD_ENABLED = true;
 
     static constexpr int GMEM_SPIN_LOOP_SLEEP_NANOS = 20;
 
