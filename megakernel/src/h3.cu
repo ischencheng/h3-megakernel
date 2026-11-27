@@ -3,6 +3,7 @@
 
 #include "h3.cuh"
 #include "ops/add_one.cuh"
+#include "ops/norm_mod_quant.cuh"
 #include "pyutils/pyutils.cuh"
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
