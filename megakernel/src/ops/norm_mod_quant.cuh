@@ -28,6 +28,30 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         }
     };
 
+    // loader streams this tile's chunks through the 5 pages as a ring: chunk i -> logical page i % NUM_PAGES
+    // semaphores: full[slot] = semaphores()[slot]              (TMA landed; consumers wait on it)
+    //             empty[slot] = semaphores()[NUM_PAGES + slot] (all consumer warps done reading; loader waits on it)
+    struct loader {
+        template <typename globals>
+        static __device__ void run(const globals &g, megakernel::state<config> &s) {
+            if (kittens::laneid() != 0) return; // one thread issues every TMA load
+            const int row_tile = s.instruction()[1]; // same 128 rows for every chunk; only the column tile changes
+            for (int i = 0; i < NUM_CHUNKS; i++) { // TODO: 2 * NUM_CHUNKS once pass 2 reloads the row
+                const int slot = i % config::NUM_PAGES;
+                const int page_id = s.pid(slot);
+                if (i < config::NUM_PAGES) s.wait_page_ready(page_id); // wait page ready gets ownership of this page from a previous instruction
+                else kittens::wait(s.semaphores()[config::NUM_PAGES + slot], (i / config::NUM_PAGES - 1) & 1); // consumers done with chunk i - 5, wait for the empty sempahore indicator.
+                // lsb is enough to wait bc you use the semaphores in a ring
+
+                auto &chunk = *reinterpret_cast<kittens::st_bf<128, CHUNK_COLS> *>(s.pages[pid].data);
+                kittens::tma::expect(s.semaphores()[slot], chunk); // full[slot] completes when this many bytes land
+
+                // load the relevant 128 row x 64 col chunk from the hidden_t x in globals into the page (shared memory)
+                kittens::tma::load_async(chunk, g.x, {0, 0, row_tile, i % NUM_CHUNKS}, s.semaphores()[slot]);
+            }
+        }
+    };
+
     /* consumer does computation*/
     struct consumer {
         template <typename globals>
