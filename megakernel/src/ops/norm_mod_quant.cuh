@@ -15,9 +15,10 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         static __device__ int
         release_lid(const globals &g,
                     typename config::instruction_t &instruction, int &query) {
-            // pages in the order we free them: 1-4 right away, 0 after the store,
-            // so the next instruction's logical page 0 is one that's already free
-            return (query + 1) % config::NUM_PAGES;
+
+            constexpr int TOTAL_LOADS = 2 * NUM_CHUNKS; // 2 passes
+            constexpr int FIRST_OF_LAST = TOTAL_LOADS - config::NUM_PAGES; // load 79: first of the last 5
+            return (FIRST_OF_LAST + query) % config::NUM_PAGES; // Given a queried released order, returns a page
         }
         template <typename globals>
         static __device__ int init_semaphores(const globals &g,
