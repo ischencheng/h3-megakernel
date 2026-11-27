@@ -82,10 +82,13 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 kittens::warp::row_sum(sum, xf, sum); // accumulate by the 16 rows
             }
 
-            // calculate inv
-            kittens::rt_fl<16, 64>::col_vec inv;
-            for (int j = 0; j < 16; ++j) {
-                inv[j] = rsqrt(sum[j] / HIDDEN_DIM + NORM_EPS);
+            // calculate inv = rsqrt(mean(x^2) + eps) per row, store in sum
+            // each lane holds 2 rows sums per slot (.x = row lane/4, .y = row lane/4 + 8), so apply to both
+            for (int o = 0; o < sum.outer_dim; ++o) {
+                for (int n = 0; n < sum.inner_dim; ++n) {
+                    sum.data[o][n].x = rsqrtf(sum.data[o][n].x / HIDDEN_DIM + NORM_EPS);
+                    sum.data[o][n].y = rsqrtf(sum.data[o][n].y / HIDDEN_DIM + NORM_EPS);
+                }
             }
 
             // here the x^2 sum is complete in sum, now we go to second pass for calculating normed value and doing mod/quant
