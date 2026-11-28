@@ -4,6 +4,7 @@ Norm Mod Quant
 
 import struct
 from dataclasses import dataclass
+import sys
 from pathlib import Path
 
 import torch
@@ -11,11 +12,13 @@ from fastvideo.models.dits.minimax_h3_fusions import fused_rmsnorm_modulate
 from flashinfer import fp4_quantize
 from torch.utils.cpp_extension import load
 
+SRC = Path(__file__).resolve().parents[1]  # megakernel/src: h3.cu, instructions.py, scheduler.py
+ROOT = SRC.parents[1]
+sys.path.insert(0, str(SRC))
+
 from instructions import BaseGlobals, NoOp, NormModQuant
 from scheduler import DAG_Node, Schedule, assign_to_sms, tensorize_instructions
 
-SRC = Path(__file__).resolve().parent
-ROOT = SRC.parents[1]
 
 # must match megakernel/src/h3.cuh
 HIDDEN_DIM = 5376
@@ -95,8 +98,10 @@ def run(mk, rows, mode):
     tensorize_instructions(globs, queues)  # pads with NoOps, sets globs.instructions / globs.timings
 
     # mk is pybind module from build() / h3.cu created in main
-    mk.h3(globs.instructions, globs.timings, globs.input_weights, globs.output_weights, globs.x,
-          globs.norm_weight_vec, globs.adaln_table, globs.adaln_index, globs.packed, globs.scales)  # 10 args
+    def ours():
+        mk.h3(globs.instructions, globs.timings, globs.input_weights, globs.output_weights, globs.x,
+              globs.norm_weight_vec, globs.adaln_table, globs.adaln_index, globs.packed, globs.scales.view(torch.bfloat16))  # 10 args
+    ours()
     torch.cuda.synchronize()
 
     # byte-level match; not exactly 1.0 since our sum of squares adds in a different order than Triton's
@@ -107,7 +112,32 @@ def run(mk, rows, mode):
           f"per_sm={globs.instructions.shape[1]:3d}  packed_match={packed_match:.6f}  "
           f"scales_match={scales_match:.6f}  {'PASS' if ok else 'FAIL'}")
     print_timings(globs)
-    return ok
+
+    # wall time on the GPU, same inputs for both sides
+    gsf_t = torch.tensor([gsf], device="cuda", dtype=torch.float32)
+    norm = lambda: fused_rmsnorm_modulate(x, weight, table[:, H:2 * H], table[:, 0:H], index, 1e-5)
+    timing = {
+        "rows": rows,
+        "ours": gpu_ms(ours),
+        "fv_norm": gpu_ms(norm),
+        "fv_quant": gpu_ms(lambda: fp4_quantize(y, gsf_t)),
+        "fv_total": gpu_ms(lambda: fp4_quantize(norm(), gsf_t)),
+    }
+    return ok, timing
+
+
+def gpu_ms(fn, warmup=3, iters=20):
+    """Average milliseconds per call, measured with CUDA events."""
+    for _ in range(warmup):
+        fn()
+    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    torch.cuda.synchronize()
+    start.record()
+    for _ in range(iters):
+        fn()
+    end.record()
+    torch.cuda.synchronize()
+    return start.elapsed_time(end) / iters
 
 
 def print_timings(globs):
@@ -142,8 +172,15 @@ def main():
     # 37710 rows: real H3 sequence (37296 video + 414 audio), 295 tiles > 188 SMs,
     #   so some SMs run two back to back, which exercises page handoff between instructions.
     # round robin: tiles are independent and equal cost, so spreading them evenly is all that matters
-    results = [run(mk, rows, "rr") for rows in (128, 300, 37710)]
-    if not all(results):
+    results = [run(mk, rows, "rr") for rows in (300, 4096, 37710, 75420)]
+
+    print("\ntime per call (ms), FastVideo = fused_rmsnorm_modulate + FlashInfer fp4_quantize")
+    print(f"{'rows':>6}  {'ours':>8}  {'fastvideo':>9}  {'(norm':>8}  {'+ quant)':>8}  {'speedup':>7}")
+    for _, t in results:
+        print(f"{t['rows']:>6}  {t['ours']:>8.3f}  {t['fv_total']:>9.3f}  {t['fv_norm']:>8.3f}  "
+              f"{t['fv_quant']:>8.3f}  {t['fv_total'] / t['ours']:>6.2f}x")
+
+    if not all(ok for ok, _ in results):
         raise SystemExit(1)
 
 

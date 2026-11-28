@@ -81,7 +81,7 @@ struct NormModQuantOp : megakernel::NoOp<config> {
     /* consumer does computation*/
     struct consumer {
         template <typename globals>
-        static __device__ void run(const globals &g, state<config> &s) {
+        static __device__ void run(const globals &g, megakernel::state<config> &s) {
             typename kittens::rt_fl<16, 64>::col_vec sum; // one FP32 value per row (16 rows)
             kittens::warp::zero(sum);
             int i = 0;
@@ -222,8 +222,8 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                         *reinterpret_cast<uint8_t *>(pk.idx(pk.data, make_int2(rl, cb))) = q_byte[j][k]; // idx applies the tile swizzle TMA expects
                     }
                     if (lane % 4 == 0) { // scale is repeated four times so only need first one
-                        sf_stage[(rl_top % 32) * 16 + (rl_top / 32) * 4 + j] = sf_byte[j][0];
-                        sf_stage[((rl_top + 8) % 32) * 16 + ((rl_top + 8) / 32) * 4 + j] = sf_byte[j][1];
+                        sf_stage[(rl_top % 32) * 16 + (rl_top / 32) * 4 + j] = row_top < S ? sf_byte[j][0] : 0; // padding rows past S get scale 0, like FlashInfer
+                        sf_stage[((rl_top + 8) % 32) * 16 + ((rl_top + 8) / 32) * 4 + j] = row_bot < S ? sf_byte[j][1] : 0;
                     }
                 }
                 asm volatile("fence.proxy.async.shared::cta;\n" ::: "memory"); // makes sure we have completed write visible to TMA
@@ -247,7 +247,7 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 kittens::wait(s.semaphores()[2 * INPUT_PAGES + stage], (n / OUT_STAGES) & 1); // out_full: all 8 warps staged chunk n
                 if (kittens::laneid() == 0) {
                     auto &pk = *reinterpret_cast<kittens::st_fp8e4m3<128, CHUNK_COLS / 2> *>(out + stage * 4096);
-                    auto &sf = *reinterpret_cast<kittens::sv<kittens::fp8e4m3, 512> *>(out + OUT_STAGES * 4096 + stage * 512);
+                    auto &sf = *reinterpret_cast<kittens::sv_bf<256> *>(out + OUT_STAGES * 4096 + stage * 512);
                     kittens::tma::store_async(g.packed, pk, {0, 0, row_tile, n}); // 128 rows x 32 bytes
                     kittens::tma::store_async(g.scales, sf, {0, 0, row_tile * NUM_CHUNKS + n, 0}); // 512 contiguous bytes
                     kittens::tma::store_async_read_wait(); // TMA done reading the slot

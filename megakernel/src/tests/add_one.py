@@ -5,16 +5,19 @@ The first run compiles the extension, which takes a minute or two.
 """
 
 from dataclasses import dataclass
+import sys
 from pathlib import Path
 
 import torch
 from torch.utils.cpp_extension import load
 
+SRC = Path(__file__).resolve().parents[1]  # megakernel/src: h3.cu, instructions.py, scheduler.py
+ROOT = SRC.parents[1]
+sys.path.insert(0, str(SRC))
+
 from instructions import AddOne, BaseGlobals, NoOp
 from scheduler import DAG_Node, Schedule, assign_to_sms, tensorize_instructions
 
-SRC = Path(__file__).resolve().parent
-ROOT = SRC.parents[1]
 
 # must match megakernel/src/h3.cuh
 HIDDEN_DIM = 5376
