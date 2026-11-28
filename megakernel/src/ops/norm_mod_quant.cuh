@@ -69,7 +69,7 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 else kittens::wait(s.semaphores()[INPUT_PAGES + slot], (i / INPUT_PAGES - 1) & 1); // consumers done with chunk i - 5, wait for the empty sempahore indicator.
                 // lsb is enough to wait bc you use the semaphores in a ring
 
-                auto &chunk = *reinterpret_cast<kittens::st_bf<128, CHUNK_COLS> *>(s.pages[pid].data);
+                auto &chunk = *reinterpret_cast<kittens::st_bf<128, CHUNK_COLS> *>(s.pages[page_id].data);
                 kittens::tma::expect(s.semaphores()[slot], chunk); // full[slot] completes when this many bytes land
 
                 // load the relevant 128 row x 64 col chunk from the hidden_t x in globals into the page (shared memory)
@@ -93,6 +93,8 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
                 kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
                 kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // load the rows for this consumer warp
+                __syncwarp();
+                kittens::warp::arrive(s.semaphores()[INPUT_PAGES + logical_slot]); // empty: this warp is done reading the chunk
 
                 kittens::warp::mul(xf, xf, xf); // x^2
                 kittens::warp::row_sum(sum, xf, sum); // accumulate by the 16 rows
@@ -137,9 +139,12 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
                 kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
                 kittens::group<config::NUM_CONSUMER_WARPS>::load(xf, chunk); // load the rows for this consumer warp
+                __syncwarp();
+                kittens::warp::arrive(s.semaphores()[INPUT_PAGES + logical_slot]); // warp done reading chunk
+                if (i >= 2 * NUM_CHUNKS - INPUT_PAGES) s.warp_finish_page(page_id, 1); // last use of this page: give it to the next instruction
 
-                // calculation for second phase: 
-                kittens::warp::mul(xf, xf, sum); // sum = inv rms
+                // calculation for second phase:
+                kittens::warp::mul_row(xf, xf, sum); // sum = inv rms
 
                 // multiply by the learned weight (final part of rms norm)
                 kittens::rt_fl<16, 64>::row_vec wv; // one value per column, laid out to match xf
@@ -234,7 +239,23 @@ struct NormModQuantOp : megakernel::NoOp<config> {
         template <typename globals>
         static __device__ void run(const globals &g, megakernel::state<config> &s) {
             const int out_pid = s.pid(INPUT_PAGES);
-            s.wait_page_ready(out_pid); // TODO: store loop goes after this
+            s.wait_page_ready(out_pid);
+            uint8_t *out = reinterpret_cast<uint8_t *>(s.pages[out_pid].data);
+            const int row_tile = s.instruction()[1];
+            for (int n = 0; n < NUM_CHUNKS; ++n) {
+                const int stage = n % OUT_STAGES;
+                kittens::wait(s.semaphores()[2 * INPUT_PAGES + stage], (n / OUT_STAGES) & 1); // out_full: all 8 warps staged chunk n
+                if (kittens::laneid() == 0) {
+                    auto &pk = *reinterpret_cast<kittens::st_fp8e4m3<128, CHUNK_COLS / 2> *>(out + stage * 4096);
+                    auto &sf = *reinterpret_cast<kittens::sv<kittens::fp8e4m3, 512> *>(out + OUT_STAGES * 4096 + stage * 512);
+                    kittens::tma::store_async(g.packed, pk, {0, 0, row_tile, n}); // 128 rows x 32 bytes
+                    kittens::tma::store_async(g.scales, sf, {0, 0, row_tile * NUM_CHUNKS + n, 0}); // 512 contiguous bytes
+                    kittens::tma::store_async_read_wait(); // TMA done reading the slot
+                }
+                __syncwarp();
+                kittens::warp::arrive(s.semaphores()[2 * INPUT_PAGES + OUT_STAGES + stage]); // out_empty: slot can be rewritten
+            }
+            if (kittens::laneid() == 0) kittens::tma::store_async_wait(); // stores landed in global
             s.warp_finish_page(out_pid, config::NUM_CONSUMER_WARPS); // release staging page to the next instruction
         }
     };
