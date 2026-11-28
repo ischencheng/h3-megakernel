@@ -8,6 +8,8 @@ First operation in the DiT block: covers the adaLN norm and fp4 quantization
 
 struct NormModQuantOp : megakernel::NoOp<config> {
     static constexpr int opcode = OPCODE_NORM_MOD_QUANT;
+    static constexpr int INPUT_PAGES = config::NUM_PAGES - 1; // last logical page is reserved for output staging
+    static constexpr int OUT_STAGES = 3; // staging slots in the output page: 3 x (4096 B packed + 512 B scales)
 
     // approximate reciprocal, as FlashInfer's reciprocal_approximate_ftz; needed to match its scales bit-exactly
     __device__ static inline float rcp_approx(float a) {
@@ -25,8 +27,9 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                     typename config::instruction_t &instruction, int &query) {
 
             constexpr int TOTAL_LOADS = 2 * NUM_CHUNKS; // 2 passes
-            constexpr int FIRST_OF_LAST = TOTAL_LOADS - config::NUM_PAGES; // load 79: first of the last 5
-            return (FIRST_OF_LAST + query) % config::NUM_PAGES; // Given a queried released order, returns a page
+            constexpr int FIRST_OF_LAST = TOTAL_LOADS - INPUT_PAGES; // load 79: first of the last 5
+            if (query == INPUT_PAGES) return INPUT_PAGES; // staging page is released last
+            return (FIRST_OF_LAST + query) % INPUT_PAGES; // Given a queried released order, returns a page
         }
         template <typename globals>
         static __device__ int init_semaphores(const globals &g,
@@ -35,14 +38,19 @@ struct NormModQuantOp : megakernel::NoOp<config> {
             // semaphores [5 .. 9] for the pages being empty and ready to load into
             // load each with NUM_CHUNKS * 2 / 5?
             #pragma unroll
-            for (int i = 0; i < config::NUM_PAGES; ++i) {
+            for (int i = 0; i < INPUT_PAGES; ++i) {
                 kittens::init_semaphore(s.semaphores()[i], 1); // loaded
             }
             #pragma unroll
-            for (int i = config::NUM_PAGES; i < config::NUM_PAGES * 2; ++i) {
+            for (int i = INPUT_PAGES; i < INPUT_PAGES * 2; ++i) {
                 kittens::init_semaphore(s.semaphores()[i], config::NUM_CONSUMER_WARPS); // computation completed, requires all consumer warps to finish
             }
-            return config::NUM_PAGES * 2; // 2 semaphores used per shared memory page
+            #pragma unroll
+            for (int i = 0; i < OUT_STAGES; ++i) {
+                kittens::init_semaphore(s.semaphores()[2 * INPUT_PAGES + i], config::NUM_CONSUMER_WARPS); // out_full: every consumer warp staged its rows
+                kittens::init_semaphore(s.semaphores()[2 * INPUT_PAGES + OUT_STAGES + i], 1); // out_empty: storer finished reading the slot
+            }
+            return INPUT_PAGES * 2 + OUT_STAGES * 2; // 2 semaphores used per shared memory page, 2 per staging slot
         }
     };
 
@@ -55,10 +63,10 @@ struct NormModQuantOp : megakernel::NoOp<config> {
             if (kittens::laneid() != 0) return; // one thread issues every TMA load
             const int row_tile = s.instruction()[1]; // same 128 rows for every chunk; only the column tile changes
             for (int i = 0; i < 2 * NUM_CHUNKS; i++) { 
-                const int slot = i % config::NUM_PAGES;
+                const int slot = i % INPUT_PAGES;
                 const int page_id = s.pid(slot);
-                if (i < config::NUM_PAGES) s.wait_page_ready(page_id); // wait page ready gets ownership of this page from a previous instruction
-                else kittens::wait(s.semaphores()[config::NUM_PAGES + slot], (i / config::NUM_PAGES - 1) & 1); // consumers done with chunk i - 5, wait for the empty sempahore indicator.
+                if (i < INPUT_PAGES) s.wait_page_ready(page_id); // wait page ready gets ownership of this page from a previous instruction
+                else kittens::wait(s.semaphores()[INPUT_PAGES + slot], (i / INPUT_PAGES - 1) & 1); // consumers done with chunk i - 5, wait for the empty sempahore indicator.
                 // lsb is enough to wait bc you use the semaphores in a ring
 
                 auto &chunk = *reinterpret_cast<kittens::st_bf<128, CHUNK_COLS> *>(s.pages[pid].data);
@@ -78,9 +86,9 @@ struct NormModQuantOp : megakernel::NoOp<config> {
             kittens::warp::zero(sum);
             int i = 0;
             for (; i < NUM_CHUNKS; ++i) {
-                const int logical_slot = i % config::NUM_PAGES;
+                const int logical_slot = i % INPUT_PAGES;
                 const int page_id = s.pid(logical_slot);
-                kittens::wait(s.semaphores()[logical_slot], (i / config::NUM_PAGES) & 1); // chunk i is ready
+                kittens::wait(s.semaphores()[logical_slot], (i / INPUT_PAGES) & 1); // chunk i is ready
 
                 auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
                 kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
@@ -99,7 +107,6 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                 }
             }
 
-            // modulation setup, once per instruction: this lane's two rows and the table rows they use.
             // register layout of xf (per 16x16 sub-tile j, per lane): data[0] = top row, cols 2*(lane%4), +1
             //   data[1] = bottom row, same cols; data[2] = top row, cols +8, +9; data[3] = bottom row, cols +8, +9
             //   top row = lane/4, bottom row = lane/4 + 8 (of this warp's 16)
@@ -117,11 +124,15 @@ struct NormModQuantOp : megakernel::NoOp<config> {
             const kittens::bf16 *shift_bot = g.adaln_table.raw_ptr + t_bot * stride + shift_off;
             const kittens::bf16 *scale_bot = g.adaln_table.raw_ptr + t_bot * stride + scale_off;
 
+            s.wait_page_ready(s.pid(INPUT_PAGES)); // take ownership of the staging page before writing outputs to it
+            uint8_t *out = reinterpret_cast<uint8_t *>(s.pages[s.pid(INPUT_PAGES)].data);
+            const int rl_top = row_top - s.instruction()[1] * 128; // top row within the 128-row tile
+
             // here the x^2 sum is complete in sum, now we go to second pass for calculating normed value and doing mod/quant
             for (; i < 2 * NUM_CHUNKS; ++i) {
-                const int logical_slot = i % config::NUM_PAGES;
+                const int logical_slot = i % INPUT_PAGES;
                 const int page_id = s.pid(logical_slot);
-                kittens::wait(s.semaphores()[logical_slot], (i / config::NUM_PAGES) & 1); // chunk i is ready
+                kittens::wait(s.semaphores()[logical_slot], (i / INPUT_PAGES) & 1); // chunk i is ready
 
                 auto &chunk = *reinterpret_cast<kittens::st_bf<128, 64> *>(s.pages[page_id].data);
                 kittens::rt_fl<16, 64> xf; // this warp's 16 rows of the chunk, 64 cols out of H which fits into the shared page
@@ -188,13 +199,43 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                         const float os = out_scale[k & 1]; // odd k: bottom row
                         v.x *= os;
                         v.y *= os;
-                        q_byte[j][k] = __nv_cvt_float2_to_fp4x2(v, __NV_E2M1, cudaRoundNearest); // .x (even column) -> low nibble
+                        q_byte[j][k] = __nv_cvt_float2_to_fp4x2(v, __NV_E2M1, cudaRoundNearest);
                     }
                 }
 
+                // stage this chunk's outputs in slot n % OUT_STAGES for the storer
+                const int n = i - NUM_CHUNKS, stage = n % OUT_STAGES;
+                kittens::wait(s.semaphores()[2 * INPUT_PAGES + OUT_STAGES + stage], ((n / OUT_STAGES) & 1) ^ 1); // wait on appropriate out-empty semaphore
+                auto &pk = *reinterpret_cast<kittens::st_fp8e4m3<128, CHUNK_COLS / 2> *>(out + stage * 4096); // fp8 contains fp4 pairs
+                uint8_t *sf_stage = out + OUT_STAGES * 4096 + stage * 512; // already in the 128x4 swizzle order
+                #pragma unroll
+                for (int j = 0; j < 4; ++j) {
+                    #pragma unroll
+                    for (int k = 0; k < 4; ++k) {
+                        const int rl = rl_top + (k & 1) * 8;
+                        const int cb = 8 * j + lane % 4 + (k >= 2 ? 4 : 0); // byte column = column in chunk / 2
+                        *reinterpret_cast<uint8_t *>(pk.idx(pk.data, make_int2(rl, cb))) = q_byte[j][k]; // idx applies the tile swizzle TMA expects
+                    }
+                    if (lane % 4 == 0) { // scale is repeated four times so only need first one
+                        sf_stage[(rl_top % 32) * 16 + (rl_top / 32) * 4 + j] = sf_byte[j][0];
+                        sf_stage[((rl_top + 8) % 32) * 16 + ((rl_top + 8) / 32) * 4 + j] = sf_byte[j][1];
+                    }
+                }
+                asm volatile("fence.proxy.async.shared::cta;\n" ::: "memory"); // makes sure we have completed write visible to TMA
+                __syncwarp(); // all threads in warp are good
+                kittens::warp::arrive(s.semaphores()[2 * INPUT_PAGES + stage]); // out_full
 
             }
 
+        }
+    };
+
+    struct storer {
+        template <typename globals>
+        static __device__ void run(const globals &g, megakernel::state<config> &s) {
+            const int out_pid = s.pid(INPUT_PAGES);
+            s.wait_page_ready(out_pid); // TODO: store loop goes after this
+            s.warp_finish_page(out_pid, config::NUM_CONSUMER_WARPS); // release staging page to the next instruction
         }
     };
 };
