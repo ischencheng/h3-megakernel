@@ -3,10 +3,18 @@ First operation in the DiT block: covers the adaLN norm and fp4 quantization
 */
 
 #pragma once
+#include <cuda_fp4.h> // __nv_cvt_float2_to_fp4x2
 #include "../h3.cuh"
 
 struct NormModQuantOp : megakernel::NoOp<config> {
     static constexpr int opcode = OPCODE_NORM_MOD_QUANT;
+
+    // approximate reciprocal, as FlashInfer's reciprocal_approximate_ftz; needed to match its scales bit-exactly
+    __device__ static inline float rcp_approx(float a) {
+        float b;
+        asm volatile("rcp.approx.ftz.f32 %0, %1;\n" : "=f"(b) : "f"(a));
+        return b;
+    }
 
     // controller, gets semaphores and pages
     // every instruction gets fresh array of 32 semaphores
@@ -159,9 +167,31 @@ struct NormModQuantOp : megakernel::NoOp<config> {
                     kittens::warp::row_max(amax[j], blk);
                 }
 
-
-
                 // compute scale and quantize
+                // note: check FlashInfer's cvt_warp_fp16_to_fp4
+                const float global_sf = __int_as_float(s.instruction()[4]); // whole tensor max, max / scale of output
+                uint8_t sf_byte[4][2]; // [block j][top row, bottom row]: e4m3 scale bytes, for the scales write
+                uint8_t q_byte[4][4];  // [block j][k] quantized value for the thread
+                #pragma unroll
+                for (int j = 0; j < 4; ++j) {
+                    float out_scale[2];
+                    #pragma unroll
+                    for (int h = 0; h < 2; ++h) { // h = 0: top row (.x), 1: bottom row (.y)
+                        const float vmax = h ? amax[j].data[0][0].y : amax[j].data[0][0].x;
+                        const __nv_fp8_e4m3 sf(global_sf * (vmax * rcp_approx(6.0f))); // vmax / 6 (largest e2m1)
+                        sf_byte[j][h] = sf.__x;
+                        out_scale[h] = sf.__x != 0 ? rcp_approx(float(sf) * rcp_approx(global_sf)) : 0.0f;
+                    }
+                    #pragma unroll
+                    for (int k = 0; k < 4; ++k) {
+                        float2 v = xf.tiles[0][j].data[k];
+                        const float os = out_scale[k & 1]; // odd k: bottom row
+                        v.x *= os;
+                        v.y *= os;
+                        q_byte[j][k] = __nv_cvt_float2_to_fp4x2(v, __NV_E2M1, cudaRoundNearest); // .x (even column) -> low nibble
+                    }
+                }
+
 
             }
 
