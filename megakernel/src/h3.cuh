@@ -53,6 +53,8 @@ struct globals_t {
     using hidden_col_t = kittens::gl<kittens::bf16, 1, 1, 1, H3_HIDDEN_DIM>; // [5376] shape
     using adaln_table_t = kittens::gl<kittens::bf16, 1, 1, -1, -1>; // [unique timesteps, row stride], shift/scale/gate at offsets
     using token_index_t = kittens::gl<int, 1, 1, 1, -1>; // [S], which table row each token uses
+    using packed_t = kittens::gl<kittens::fp8e4m3, 1, 1, -1, H3_HIDDEN_DIM / 2, kittens::st_fp8e4m3<128, CHUNK_COLS / 2>>; // [S, 2688]
+    using scales_t = kittens::gl<kittens::fp8e4m3, 1, 1, -1, 512, kittens::sv<kittens::fp8e4m3, 512>>; // [ceil(S/128) * 84, 512] swizzled e4m3 scales
  
 
     // usage: g.instructions[{sm_id, i, 0}] and g.timings[{sm_id, i, 0}]
@@ -66,6 +68,8 @@ struct globals_t {
     hidden_col_t norm_weight_vec; // weights per dim for RMS norm
     adaln_table_t adaln_table; // AdaLN modulation table, one row per unique timestep
     token_index_t adaln_index; // table row for each token
+    packed_t packed; // output for norm mod quant op
+    scales_t scales; // output for norm mod quant op
 
     // launch shape for kittens::py::bind_kernel: one block per SM, since the
     // runtime indexes instructions by get_smid(), not blockIdx.x

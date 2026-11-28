@@ -18,5 +18,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &globals_t::instructions, // these are the 4 args
         &globals_t::timings,
         &globals_t::input_weights,
-        &globals_t::output_weights);
+        &globals_t::output_weights,
+        &globals_t::x,
+        &globals_t::norm_weight_vec,
+        &globals_t::adaln_table,
+        &globals_t::adaln_index,
+        &globals_t::packed,
+        &globals_t::scales);
 }
