@@ -5,6 +5,12 @@
 #include "ops/add_one.cuh"
 #include "ops/norm_mod_quant.cuh"
 #include "pyutils/pyutils.cuh"
+#include <cute/arch/mma_sm120.hpp> // CUTLASS's NVFP4 mma
+
+// fail the build if the FP4 mma not available
+#if defined(__CUDA_ARCH__) && !defined(CUTE_ARCH_MXF4NVF4_4X_UE4M3_MMA_ENABLED)
+#error "mxf4nvf4 block-scaled mma.sync not enabled: compile for sm_120a"
+#endif
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // argument order must match the member order in globals_t

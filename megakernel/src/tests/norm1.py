@@ -33,6 +33,7 @@ def build():
             str(SRC),
             str(ROOT / "megakernel" / "include"),
             str(ROOT / "ThunderKittens" / "include"),
+            "/FastVideo/fastvideo-kernel/include/cutlass/include",  # CUTLASS v4.3.0
         ],
         extra_cuda_cflags=[
             "-std=c++20",
